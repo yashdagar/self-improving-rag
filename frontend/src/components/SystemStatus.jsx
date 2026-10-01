@@ -15,6 +15,12 @@ export default function SystemStatus({ status }) {
           </li>
         ))}
       </ul>
+      <h3>Stored</h3>
+      <div className="chips">
+        {Object.entries(status.counts).map(([name, count]) => (
+          <span className="chip" key={name}>{count} {name.replace("_", " ")}</span>
+        ))}
+      </div>
       <h3>arXiv categories</h3>
       <div className="chips">
         {retrieval.arxiv_categories.map((category) => (

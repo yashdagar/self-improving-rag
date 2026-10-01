@@ -1,24 +1,25 @@
 const WEIGHTS = [
-  { key: "alpha_init", label: "α semantic" },
-  { key: "beta_init", label: "β recency" },
-  { key: "gamma_init", label: "γ feedback" },
+  { key: "alpha", label: "α semantic" },
+  { key: "beta", label: "β recency" },
+  { key: "gamma", label: "γ feedback" },
 ];
 
-export default function RankingWeights({ ranking }) {
+export default function RankingWeights({ history }) {
+  const { current, weight_min, weight_max, learning_rate, snapshots } = history;
   return (
     <section className="card">
       <h2 className="headline-sm">Ranking weights</h2>
       <p className="body-sm muted">
-        Initial values, bounded to [{ranking.weight_min}, {ranking.weight_max}], learning rate{" "}
-        {ranking.learning_rate}
+        Current values after {snapshots.length - 1} updates, bounded to [{weight_min}, {weight_max}],
+        learning rate {learning_rate}
       </p>
       {WEIGHTS.map(({ key, label }) => (
         <div className="weight" key={key}>
           <span>{label}</span>
           <div className="bar">
-            <div style={{ width: `${ranking[key] * 100}%` }} />
+            <div style={{ width: `${current[key] * 100}%` }} />
           </div>
-          <span>{ranking[key].toFixed(2)}</span>
+          <span>{current[key].toFixed(2)}</span>
         </div>
       ))}
     </section>

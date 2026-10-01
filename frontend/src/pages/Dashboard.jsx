@@ -7,10 +7,16 @@ import RankingWeights from "../components/RankingWeights.jsx";
 
 export default function Dashboard() {
   const [status, setStatus] = useState(null);
+  const [history, setHistory] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    api.systemStatus().then(setStatus).catch((err) => setError(err.message));
+    Promise.all([api.systemStatus(), api.improvementHistory()])
+      .then(([statusData, historyData]) => {
+        setStatus(statusData);
+        setHistory(historyData);
+      })
+      .catch((err) => setError(err.message));
   }, []);
 
   return (
@@ -26,10 +32,10 @@ export default function Dashboard() {
           <p className="search-hint caption muted">The query pipeline is enabled in Phase 7</p>
           {error && <p className="error">Backend unreachable: {error}</p>}
           {!status && !error && <p className="muted">Loading…</p>}
-          {status && (
+          {status && history && (
             <div className="grid">
               <SystemStatus status={status} />
-              <RankingWeights ranking={status.ranking} />
+              <RankingWeights history={history} />
             </div>
           )}
         </div>
