@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import JSON, CheckConstraint, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base, UTCDateTime, utcnow
@@ -20,6 +20,9 @@ class QueryRecord(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     text: Mapped[str] = mapped_column(Text)
     reformulated_text: Mapped[str | None] = mapped_column(Text)
+    keywords: Mapped[list[str]] = mapped_column(JSON, default=list)
+    search_query: Mapped[str | None] = mapped_column(Text)
+    embedding: Mapped[list[float] | None] = mapped_column(JSON)
     mode: Mapped[str] = mapped_column(String(16), index=True)
     status: Mapped[str] = mapped_column(String(16), default="pending")
     answer: Mapped[str | None] = mapped_column(Text)
@@ -61,10 +64,12 @@ class RetrievedChunk(Base):
     query_id: Mapped[int] = mapped_column(ForeignKey("queries.id", ondelete="CASCADE"), index=True)
     chunk_id: Mapped[str] = mapped_column(ForeignKey("chunks.id"), index=True)
     rank: Mapped[int]
+    similarity: Mapped[float]
     semantic_score: Mapped[float]
     recency_score: Mapped[float]
     feedback_score: Mapped[float]
     final_score: Mapped[float]
+    judged_relevance: Mapped[float | None]
 
     query: Mapped[QueryRecord] = relationship(back_populates="retrieved")
     chunk: Mapped[Chunk] = relationship()
@@ -79,6 +84,8 @@ class Citation(Base):
     marker: Mapped[int]
     chunk_id: Mapped[str] = mapped_column(ForeignKey("chunks.id"))
     claim: Mapped[str | None] = mapped_column(Text)
+    supported: Mapped[bool | None]
+    verdict_reason: Mapped[str | None] = mapped_column(Text)
 
     query: Mapped[QueryRecord] = relationship(back_populates="citations")
     chunk: Mapped[Chunk] = relationship()

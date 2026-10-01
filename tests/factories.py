@@ -51,6 +51,7 @@ def make_query(session, paper, mode="proposed", status="completed", scores=None,
         RetrievedChunk(
             chunk_id=chunk.id,
             rank=rank,
+            similarity=0.9 - rank * 0.1,
             semantic_score=0.9 - rank * 0.1,
             recency_score=0.5,
             feedback_score=0.5,

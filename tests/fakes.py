@@ -18,3 +18,33 @@ class HashEmbedder:
             vector[index] += 1.0
         norm = math.sqrt(sum(v * v for v in vector)) or 1.0
         return [v / norm for v in vector]
+
+
+class FakeArxivClient:
+    def __init__(self, papers):
+        self.papers = papers
+        self.calls = 0
+
+    def search(self, search_query, max_results):
+        from app.services.arxiv_client import ArxivSearchResult
+
+        self.calls += 1
+        return ArxivSearchResult(total_results=len(self.papers), papers=list(self.papers[:max_results]))
+
+
+def arxiv_paper(paper_id, title, abstract, published_at, pdf_url=None):
+    from app.services.arxiv_client import ArxivPaper
+
+    return ArxivPaper(
+        id=paper_id,
+        version="v1",
+        title=title,
+        authors=["Test Author"],
+        abstract=abstract,
+        categories=["cs.LG"],
+        primary_category="cs.LG",
+        published_at=published_at,
+        updated_at=None,
+        abs_url=f"https://arxiv.org/abs/{paper_id}",
+        pdf_url=pdf_url,
+    )

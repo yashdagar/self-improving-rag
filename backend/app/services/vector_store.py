@@ -64,6 +64,10 @@ class VectorStore:
         return len(chunks)
 
     def search(self, text: str, k: int, paper_ids: list[str] | None = None) -> list[VectorHit]:
+        [vector] = self.embedder.embed([text])
+        return self.search_vector(vector, k, paper_ids)
+
+    def search_vector(self, vector: list[float], k: int, paper_ids: list[str] | None = None) -> list[VectorHit]:
         if k <= 0 or self.count() == 0:
             return []
         where = None
@@ -71,7 +75,6 @@ class VectorStore:
             if not paper_ids:
                 return []
             where = {"paper_id": {"$in": list(paper_ids)}}
-        [vector] = self.embedder.embed([text])
         result = self.collection.query(
             query_embeddings=[vector],
             n_results=min(k, self.count()),

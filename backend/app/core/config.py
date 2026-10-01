@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     weight_max: float = Field(0.90, ge=0, le=1)
     weight_learning_rate: float = Field(0.10, gt=0, le=0.5)
     recency_half_life_days: float = Field(365.0, gt=0)
+    max_chunks_per_paper: int = Field(3, ge=1)
+    feedback_prior_strength: float = Field(2.0, gt=0)
+    feedback_similarity_threshold: float = Field(0.3, ge=0, lt=1)
 
     @model_validator(mode="after")
     def check_consistency(self) -> "Settings":
