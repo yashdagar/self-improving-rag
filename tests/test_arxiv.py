@@ -5,7 +5,6 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.config import Settings
 from app.main import create_app
 from app.models import ArxivSearchCache, Paper
 from app.services.arxiv_client import (
@@ -17,7 +16,6 @@ from app.services.arxiv_client import (
     parse_feed,
     split_arxiv_id,
 )
-from app.services.container import build_services
 from app.services.paper_retrieval import PaperRetriever
 from app.services.query_analysis import extract_keywords
 
@@ -51,8 +49,8 @@ class FakeClient:
 
 
 @pytest.fixture
-def fast_settings(tmp_path):
-    return Settings(_env_file=None, data_dir=tmp_path, arxiv_request_delay_seconds=0, arxiv_min_results=2)
+def fast_settings(settings):
+    return settings.model_copy(update={"arxiv_min_results": 2})
 
 
 def test_parse_feed():
@@ -153,8 +151,7 @@ def test_retriever_resets_text_on_new_version(client, db, fast_settings):
     assert (stored.version, stored.text_status) == ("v2", "pending")
 
 
-def test_search_endpoint(fast_settings):
-    services = build_services(fast_settings)
+def test_search_endpoint(fast_settings, services):
     services.paper_retriever = PaperRetriever(fast_settings, FakeClient([paper("2501.00001"), paper("2501.00002")]))
     with TestClient(create_app(fast_settings, services)) as client:
         body = client.get("/api/arxiv/search", params={"q": "graph neural networks"}).json()

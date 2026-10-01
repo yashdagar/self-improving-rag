@@ -7,9 +7,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app import __version__
-from app.api.deps import get_app_settings, get_db
+from app.api.deps import get_app_settings, get_db, get_services
 from app.core.config import Settings
 from app.models import Chunk, Feedback, Paper, QueryRecord, WeightSnapshot
+from app.services.container import Services
 from app.schemas.system import (
     ComponentStatus,
     LLMConfig,
@@ -55,19 +56,41 @@ def _database_status(db: Session, settings: Settings) -> tuple[ComponentStatus, 
     return ComponentStatus(status="ok", detail=str(settings.sqlite_path)), counts
 
 
+def _vector_status(services: Services) -> tuple[ComponentStatus, ComponentStatus, int]:
+    loaded = getattr(services.embedder, "loaded", True)
+    embeddings = ComponentStatus(
+        status="ok",
+        detail=f"{services.embedder.model_name} ({'loaded' if loaded else 'loads on first use'})",
+    )
+    try:
+        count = services.vector_store.count()
+    except Exception as exc:
+        return ComponentStatus(status="error", detail=str(exc)), embeddings, 0
+    return ComponentStatus(status="ok", detail=f"{count} chunk vectors"), embeddings, count
+
+
 @router.get("/status", response_model=SystemStatus)
 def system_status(
     settings: Settings = Depends(get_app_settings),
     db: Session = Depends(get_db),
+    services: Services = Depends(get_services),
 ) -> SystemStatus:
     llm = _llm_status(settings)
     database, counts = _database_status(db, settings)
+    vector_store, embeddings, vector_count = _vector_status(services)
+    counts["vectors"] = vector_count
     return SystemStatus(
         app_name=settings.app_name,
         version=__version__,
         environment=settings.environment,
         server_time=datetime.now(timezone.utc),
-        components={"storage": _storage_status(settings), "database": database, "llm": llm},
+        components={
+            "storage": _storage_status(settings),
+            "database": database,
+            "vector_store": vector_store,
+            "embeddings": embeddings,
+            "llm": llm,
+        },
         counts=counts,
         retrieval=RetrievalConfig(
             arxiv_categories=settings.arxiv_categories,

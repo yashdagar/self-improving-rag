@@ -59,6 +59,7 @@ class DocumentProcessor:
             paper.pdf_error = "no PDF link"
 
         paper.chunks.clear()
+        paper.indexed_model = None
         session.flush()
         for index, draft in enumerate(abstract + body):
             paper.chunks.append(

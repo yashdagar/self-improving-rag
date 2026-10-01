@@ -28,6 +28,7 @@ class Paper(Base):
     pdf_url: Mapped[str | None] = mapped_column(String(256))
     text_status: Mapped[str] = mapped_column(String(16), default="pending")
     pdf_error: Mapped[str | None] = mapped_column(Text)
+    indexed_model: Mapped[str | None] = mapped_column(String(128))
     fetched_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
     chunks: Mapped[list["Chunk"]] = relationship(

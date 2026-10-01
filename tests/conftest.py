@@ -3,16 +3,31 @@ from fastapi.testclient import TestClient
 
 from app.core.config import Settings
 from app.main import create_app
+from app.services.container import build_services
+from tests.fakes import HashEmbedder
 
 
 @pytest.fixture
 def settings(tmp_path):
-    return Settings(_env_file=None, environment="test", data_dir=tmp_path / "data")
+    settings = Settings(
+        _env_file=None,
+        environment="test",
+        data_dir=tmp_path / "data",
+        arxiv_request_delay_seconds=0,
+        pdf_download_delay_seconds=0,
+    )
+    settings.ensure_dirs()
+    return settings
 
 
 @pytest.fixture
-def client(settings):
-    with TestClient(create_app(settings)) as test_client:
+def services(settings):
+    return build_services(settings, embedder=HashEmbedder())
+
+
+@pytest.fixture
+def client(settings, services):
+    with TestClient(create_app(settings, services)) as test_client:
         yield test_client
 
 

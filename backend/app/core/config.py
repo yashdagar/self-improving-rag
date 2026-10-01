@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     chunk_overlap_chars: int = Field(200, ge=0)
 
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    embedding_batch_size: int = Field(32, ge=1)
+    embedding_device: str | None = None
+    chroma_collection: str = "chunks"
     retrieval_candidate_pool: int = Field(40, ge=1)
     retrieval_top_k: int = Field(8, ge=1)
 
