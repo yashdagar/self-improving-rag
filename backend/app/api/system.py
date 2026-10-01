@@ -2,10 +2,14 @@ import os
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 from app import __version__
-from app.api.deps import get_app_settings
+from app.api.deps import get_app_settings, get_db
 from app.core.config import Settings
+from app.models import Chunk, Feedback, Paper, QueryRecord, WeightSnapshot
 from app.schemas.system import (
     ComponentStatus,
     LLMConfig,
@@ -31,15 +35,40 @@ def _llm_status(settings: Settings) -> ComponentStatus:
     return ComponentStatus(status="ok", detail=f"{settings.llm_provider}:{settings.llm_model}")
 
 
+COUNTED_TABLES = {
+    "papers": Paper,
+    "chunks": Chunk,
+    "queries": QueryRecord,
+    "feedback": Feedback,
+    "weight_snapshots": WeightSnapshot,
+}
+
+
+def _database_status(db: Session, settings: Settings) -> tuple[ComponentStatus, dict[str, int]]:
+    try:
+        counts = {
+            name: db.scalar(select(func.count()).select_from(model)) or 0
+            for name, model in COUNTED_TABLES.items()
+        }
+    except SQLAlchemyError as exc:
+        return ComponentStatus(status="error", detail=str(exc)), {}
+    return ComponentStatus(status="ok", detail=str(settings.sqlite_path)), counts
+
+
 @router.get("/status", response_model=SystemStatus)
-def system_status(settings: Settings = Depends(get_app_settings)) -> SystemStatus:
+def system_status(
+    settings: Settings = Depends(get_app_settings),
+    db: Session = Depends(get_db),
+) -> SystemStatus:
     llm = _llm_status(settings)
+    database, counts = _database_status(db, settings)
     return SystemStatus(
         app_name=settings.app_name,
         version=__version__,
         environment=settings.environment,
         server_time=datetime.now(timezone.utc),
-        components={"storage": _storage_status(settings), "llm": llm},
+        components={"storage": _storage_status(settings), "database": database, "llm": llm},
+        counts=counts,
         retrieval=RetrievalConfig(
             arxiv_categories=settings.arxiv_categories,
             arxiv_max_results=settings.arxiv_max_results,

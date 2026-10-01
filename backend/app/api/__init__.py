@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
-from app.api import system
+from app.api import feedback, improvement, metrics, papers, queries, system
 
 api_router = APIRouter(prefix="/api")
-api_router.include_router(system.router)
+for module in (system, queries, feedback, papers, metrics, improvement):
+    api_router.include_router(module.router)

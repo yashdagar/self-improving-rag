@@ -40,6 +40,7 @@ class SystemStatus(BaseModel):
     environment: str
     server_time: datetime
     components: dict[str, ComponentStatus]
+    counts: dict[str, int]
     retrieval: RetrievalConfig
     ranking: RankingConfig
     llm: LLMConfig

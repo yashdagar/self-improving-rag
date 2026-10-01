@@ -6,7 +6,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import __version__
 from app.api import api_router
 from app.core.config import Settings, get_settings
+from app.core.database import create_db_engine, create_session_factory
 from app.core.logging import configure_logging
+from app.models import create_tables
+from app.services.weights import ensure_initial_snapshot
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -16,7 +19,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         settings.ensure_dirs()
+        engine = create_db_engine(settings.database_url)
+        create_tables(engine)
+        app.state.engine = engine
+        app.state.session_factory = create_session_factory(engine)
+        with app.state.session_factory() as session:
+            ensure_initial_snapshot(session, settings)
         yield
+        engine.dispose()
 
     app = FastAPI(title=settings.app_name, version=__version__, lifespan=lifespan)
     app.state.settings = settings

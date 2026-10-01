@@ -14,3 +14,9 @@ def settings(tmp_path):
 def client(settings):
     with TestClient(create_app(settings)) as test_client:
         yield test_client
+
+
+@pytest.fixture
+def db(client):
+    with client.app.state.session_factory() as session:
+        yield session
