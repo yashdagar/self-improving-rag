@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     arxiv_max_results: int = Field(20, ge=1, le=100)
     arxiv_recency_days: int | None = Field(1095, ge=1)
     arxiv_request_delay_seconds: float = Field(3.0, ge=0)
+    arxiv_api_url: str = "https://export.arxiv.org/api/query"
+    arxiv_timeout_seconds: float = Field(30.0, gt=0)
+    arxiv_cache_ttl_hours: float = Field(24.0, ge=0)
+    arxiv_min_results: int = Field(5, ge=0)
+    arxiv_max_keywords: int = Field(5, ge=1, le=10)
 
     max_pdf_pages: int = Field(30, ge=1)
     chunk_size_chars: int = Field(1200, ge=200)

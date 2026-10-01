@@ -9,10 +9,11 @@ from app.core.config import Settings, get_settings
 from app.core.database import create_db_engine, create_session_factory
 from app.core.logging import configure_logging
 from app.models import create_tables
+from app.services.container import Services, build_services
 from app.services.weights import ensure_initial_snapshot
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, services: Services | None = None) -> FastAPI:
     settings = settings or get_settings()
     configure_logging("DEBUG" if settings.environment == "development" else "INFO")
 
@@ -23,6 +24,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         create_tables(engine)
         app.state.engine = engine
         app.state.session_factory = create_session_factory(engine)
+        app.state.services = services or build_services(settings)
         with app.state.session_factory() as session:
             ensure_initial_snapshot(session, settings)
         yield
