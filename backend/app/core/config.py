@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     arxiv_max_keywords: int = Field(5, ge=1, le=10)
 
     max_pdf_pages: int = Field(30, ge=1)
+    pdf_max_papers_per_query: int = Field(8, ge=0)
+    pdf_max_bytes: int = Field(25_000_000, ge=100_000)
+    pdf_download_delay_seconds: float = Field(1.0, ge=0)
+    min_extracted_chars: int = Field(2000, ge=0)
     chunk_size_chars: int = Field(1200, ge=200)
     chunk_overlap_chars: int = Field(200, ge=0)
 

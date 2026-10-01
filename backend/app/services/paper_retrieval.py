@@ -37,6 +37,7 @@ def upsert_paper(session: Session, data: ArxivPaper) -> Paper:
         session.add(paper)
     elif paper.version != data.version and paper.text_status != "pending":
         paper.text_status = "pending"
+        paper.pdf_error = None
         paper.chunks.clear()
     for name in (
         "version", "title", "authors", "abstract", "categories", "primary_category",

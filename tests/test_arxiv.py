@@ -17,7 +17,7 @@ from app.services.arxiv_client import (
     parse_feed,
     split_arxiv_id,
 )
-from app.services.container import Services
+from app.services.container import build_services
 from app.services.paper_retrieval import PaperRetriever
 from app.services.query_analysis import extract_keywords
 
@@ -154,7 +154,8 @@ def test_retriever_resets_text_on_new_version(client, db, fast_settings):
 
 
 def test_search_endpoint(fast_settings):
-    services = Services(paper_retriever=PaperRetriever(fast_settings, FakeClient([paper("2501.00001"), paper("2501.00002")])))
+    services = build_services(fast_settings)
+    services.paper_retriever = PaperRetriever(fast_settings, FakeClient([paper("2501.00001"), paper("2501.00002")]))
     with TestClient(create_app(fast_settings, services)) as client:
         body = client.get("/api/arxiv/search", params={"q": "graph neural networks"}).json()
         assert body["keywords"] == ["graph", "neural", "networks"]

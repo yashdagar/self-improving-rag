@@ -32,6 +32,7 @@ class PaperDetail(PaperSummary):
     categories: list[str]
     updated_at: datetime | None
     text_status: str
+    pdf_error: str | None
     fetched_at: datetime
     chunk_count: int
     chunks: list[ChunkOut] | None = None
