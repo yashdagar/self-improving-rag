@@ -14,6 +14,12 @@ NAMED_HEADINGS = {
 STOP_HEADINGS = {"references", "bibliography", "acknowledgments", "acknowledgements"}
 SECTION_NUMBER = re.compile(r"^(?:\d{1,2}(?:\.\d{1,2}){0,2}\.?|[IVX]{1,5}\.?)$")
 MAX_HEADING_CHARS = 90
+BIBLIOGRAPHY_MARKERS = re.compile(
+    r"\b(?:19|20)\d{2}[a-z]?\b|et al\.|arXiv preprint|Proceedings|Conference on|In Advances|"
+    r"\bpp\.|\bvol\.|doi:|https?://|\b[A-Z]\.,"
+)
+BIBLIOGRAPHY_DENSITY = 1 / 60
+BIBLIOGRAPHY_RUN_TO_STOP = 3
 MIN_BLOCK_CHARS = 40
 MIN_ALPHA_RATIO = 0.55
 
@@ -74,6 +80,10 @@ def is_prose(text: str) -> bool:
     return letters / len(text) >= MIN_ALPHA_RATIO
 
 
+def looks_like_bibliography(text: str) -> bool:
+    return len(BIBLIOGRAPHY_MARKERS.findall(text)) >= max(3, len(text) * BIBLIOGRAPHY_DENSITY)
+
+
 def extract_blocks(path: Path, max_pages: int) -> list[TextBlock]:
     try:
         document = pymupdf.open(path)
@@ -82,6 +92,7 @@ def extract_blocks(path: Path, max_pages: int) -> list[TextBlock]:
 
     blocks: list[TextBlock] = []
     section: str | None = None
+    bibliography_run = 0
     with document:
         for page_index in range(min(max_pages, document.page_count)):
             page = document[page_index]
@@ -98,6 +109,12 @@ def extract_blocks(path: Path, max_pages: int) -> list[TextBlock]:
                     section = title
                     lines = lines[consumed:]
                 text = clean_text("\n".join(lines))
+                if looks_like_bibliography(text):
+                    bibliography_run += 1
+                    if bibliography_run >= BIBLIOGRAPHY_RUN_TO_STOP:
+                        return blocks
+                    continue
+                bibliography_run = 0
                 if is_prose(text):
                     blocks.append(TextBlock(page=page_index + 1, section=section, text=text))
     return blocks

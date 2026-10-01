@@ -8,7 +8,14 @@ from app.core.config import Settings
 from app.models import Paper
 from app.services.chunking import chunk_blocks, split_long
 from app.services.document_processor import DocumentProcessor
-from app.services.pdf_extractor import TextBlock, clean_text, detect_heading, extract_blocks, heading_title
+from app.services.pdf_extractor import (
+    TextBlock,
+    clean_text,
+    detect_heading,
+    extract_blocks,
+    heading_title,
+    looks_like_bibliography,
+)
 from app.services.pdf_fetcher import PdfFetcher, PdfFetchError, pdf_filename
 
 PARAGRAPH = (
@@ -60,6 +67,21 @@ def test_detect_heading_handles_split_and_wrapped_lines():
         1,
     )
     assert detect_heading(["We study attention in depth across many models and tasks."]) == (None, 0)
+
+
+def test_bibliography_detection():
+    reference = (
+        "Chen, C., Borgeaud, S., Irving, G., Lespiau, J.-B., Sifre, L., and Jumper, J. Accelerating large "
+        "language model decoding with speculative sampling. arXiv preprint arXiv:2302.01318, 2023. "
+        "Leviathan, Y., Kalman, M., and Matias, Y. Fast inference from transformers via speculative decoding. "
+        "In International Conference on Machine Learning, pp. 19274-19286. PMLR, 2023."
+    )
+    assert looks_like_bibliography(reference)
+    assert not looks_like_bibliography(PARAGRAPH)
+    assert not looks_like_bibliography(
+        "Leviathan et al. (2023) introduced speculative decoding, which drafts several tokens with a small "
+        "model and verifies them in parallel with the target model, preserving the output distribution."
+    )
 
 
 def test_clean_text_joins_hyphenation():
