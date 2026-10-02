@@ -56,14 +56,62 @@ cd self-improving-rag
 
 It ends with `Done. Next:`. If it stops with an error, see [Troubleshooting](#troubleshooting).
 
-### Step 3: choose an LLM and put its key in `.env`
+### Step 3: choose your model and put its key in `.env`
 
-The system needs one LLM to write answers, and optionally a second one to judge them. Open `.env` in any editor and fill in **one** of the options below. Leave every other line as it is.
+The system uses an LLM for two jobs: **writing** the answer and **judging** it (self-evaluation). You can use one model for both, or a separate model for each. Open `.env` in any editor and fill in one of the setups below; leave every other line as it is.
 
-**Option A: Grok answers, Gemini judges (recommended).** Two different providers means the judge does not share the writer's blind spots.
+Get a key from the provider you want:
 
-1. Get a Grok key at https://console.x.ai (API Keys)
-2. Get a Gemini key at https://aistudio.google.com/apikey (free tier available)
+- **Gemini:** https://aistudio.google.com/apikey (has a free tier)
+- **Grok (xAI):** https://console.x.ai
+- **Claude (Anthropic):** https://console.anthropic.com
+
+#### Setup 1: one model for everything (simplest)
+
+Fill in only the `LLM_` lines. The judge automatically uses the same model and key. Pick one provider:
+
+Gemini:
+
+```env
+LLM_PROVIDER=openai_compatible
+LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+LLM_MODEL=gemini-3.8-flash
+LLM_API_KEY=paste-your-gemini-key-here
+```
+
+Grok:
+
+```env
+LLM_PROVIDER=openai_compatible
+LLM_BASE_URL=https://api.x.ai/v1
+LLM_MODEL=grok-4.7
+LLM_API_KEY=xai-paste-your-key-here
+```
+
+Claude:
+
+```env
+LLM_PROVIDER=anthropic
+LLM_MODEL=claude-opus-5
+LLM_API_KEY=sk-ant-paste-your-key-here
+```
+
+#### Setup 2: separate models for writing and judging
+
+Add `EVALUATOR_` lines on top of Setup 1. Anything you leave empty is copied from the `LLM_` lines, so you only write what is different. A separate judge is better for the project, because a model grading its own answers can share its own blind spots.
+
+Same provider, different model (one key), for example a light Gemini writes and a stronger Gemini judges:
+
+```env
+LLM_PROVIDER=openai_compatible
+LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+LLM_MODEL=gemini-3.5-flash-lite
+LLM_API_KEY=paste-your-gemini-key-here
+
+EVALUATOR_MODEL=gemini-3.8-flash
+```
+
+Different providers (two keys), for example Grok writes and Gemini judges:
 
 ```env
 LLM_PROVIDER=openai_compatible
@@ -77,46 +125,19 @@ EVALUATOR_MODEL=gemini-3.8-flash
 EVALUATOR_API_KEY=paste-your-gemini-key-here
 ```
 
-**Option B: Gemini only (free).** Same Gemini key for both roles.
+Any combination works, including Claude for one role (`EVALUATOR_PROVIDER=anthropic`, `EVALUATOR_MODEL=claude-opus-5`, `EVALUATOR_API_KEY=sk-ant-...`). The **System** page shows which model is in each role.
 
-```env
-LLM_PROVIDER=openai_compatible
-LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-LLM_MODEL=gemini-3.8-flash
-LLM_API_KEY=paste-your-gemini-key-here
-```
+#### Checking model names
 
-**Option C: Claude.** Get a key at https://console.anthropic.com.
-
-```env
-LLM_PROVIDER=anthropic
-LLM_MODEL=claude-opus-5
-LLM_API_KEY=sk-ant-paste-your-key-here
-```
-
-**Option D: fully offline with Ollama (no key, slower).** Needs about 6 GB of free RAM.
+Model names change over time. To list the ones your key can use:
 
 ```bash
-brew install ollama                           # or https://ollama.com/download
-OLLAMA_CONTEXT_LENGTH=16384 ollama serve      # keep this terminal open
-ollama pull qwen2.5:7b-instruct               # in a second terminal, 4.7 GB once
-```
-
-```env
-LLM_PROVIDER=openai_compatible
-LLM_BASE_URL=http://localhost:11434/v1
-LLM_MODEL=qwen2.5:7b-instruct
-LLM_MAX_TOKENS=2000
-```
-
-Model names change over time. To see the names your key can use:
-
-```bash
-curl https://api.x.ai/v1/models -H "Authorization: Bearer YOUR_XAI_KEY"
 curl https://generativelanguage.googleapis.com/v1beta/openai/models -H "Authorization: Bearer YOUR_GEMINI_KEY"
+curl https://api.x.ai/v1/models -H "Authorization: Bearer YOUR_XAI_KEY"
+curl https://api.anthropic.com/v1/models -H "x-api-key: YOUR_ANTHROPIC_KEY" -H "anthropic-version: 2023-06-01"
 ```
 
-Any other OpenAI-compatible service (Groq, OpenRouter, OpenAI, vLLM) works the same way: set `LLM_PROVIDER=openai_compatible`, its base URL, a model name and your key.
+Any other service with an OpenAI-compatible API (Groq, OpenRouter, OpenAI) works the same way: `openai_compatible`, its base URL, a model name and your key.
 
 ### Step 4: start the app
 
@@ -169,7 +190,7 @@ That small run (6 questions, 2 cycles, 3 held-out paraphrases, about 24 LLM-back
 .venv/bin/python evaluation/plot_results.py full-run
 ```
 
-That is 120 queries: about 1 to 2 hours with a cloud LLM, about 3 hours with Ollama on a laptop. Results land in `evaluation/results/<run-id>/` (`report.md`, charts, CSV) and appear on the dashboard's **Experiments** page.
+That is 120 queries, about 1 to 2 hours depending on the provider and rate limits. Results land in `evaluation/results/<run-id>/` (`report.md`, charts, CSV) and appear on the dashboard's **Experiments** page.
 
 Tips for long runs:
 
@@ -185,7 +206,7 @@ Needs only [Docker Desktop](https://www.docker.com/products/docker-desktop). Do 
 docker compose up --build
 ```
 
-Open http://localhost:5173. The first build downloads about 2 GB. With Ollama on your own machine, use `LLM_BASE_URL=http://host.docker.internal:11434/v1`. Data persists in `./data`.
+Open http://localhost:5173. The first build downloads about 2 GB. Data persists in `./data`.
 
 ### Windows without Docker
 
@@ -300,7 +321,7 @@ The answer is then split into claims (sentences) and every marker is mapped to t
 
 Two LLM providers are supported:
 - **anthropic** (default, `claude-opus-5`): official SDK, `messages.parse` structured output, refusal handling via `stop_reason`, and server-side refusal fallbacks (`fallbacks: "default"`) enabled for models that support them.
-- **openai_compatible:** any `/chat/completions` endpoint (Ollama, Groq, vLLM, OpenAI), JSON mode plus schema validation with one repair attempt.
+- **openai_compatible:** any `/chat/completions` endpoint (Gemini, Grok, Groq, OpenRouter, OpenAI), JSON mode plus schema validation with one repair attempt, and a fallback without JSON mode for endpoints that reject it.
 
 ### 6. Self-evaluation
 `evaluation.py`
@@ -316,7 +337,7 @@ A second LLM call acts as a strict judge. It does not output the final scores. I
 | answer relevance | judge's 0 to 4 rating divided by 4 |
 | evidence coverage | share of the question's aspects that the retrieved evidence covers |
 
-The judge's per-chunk relevance and per-citation verdicts are saved on `retrieved_chunks.judged_relevance` and `citations.support`/`verdict_reason`; the six scores, their mean and the reasoning are saved in `evaluations`. Set `EVALUATOR_MODEL` to judge with a different model from the generator.
+The judge's per-chunk relevance and per-citation verdicts are saved on `retrieved_chunks.judged_relevance` and `citations.support`/`verdict_reason`; the six scores, their mean and the reasoning are saved in `evaluations`. The judge can be the same model as the writer or a different model or provider (Quick start, step 3).
 
 ## The self-improvement mechanism
 
@@ -448,7 +469,7 @@ Commits follow Conventional Commits, enforced by `.githooks/commit-msg`, and sou
 
 ## Limitations
 
-- The judge is an LLM, and by default the same model as the generator, so self-evaluation can share the generator's blind spots. Use `EVALUATOR_MODEL` to separate them, and read the stored reasoning rather than the numbers alone.
+- The judge is an LLM, and by default the same model as the generator, so self-evaluation can share the generator's blind spots. Use a separate judge (Quick start, Setup 2) and read the stored reasoning rather than the numbers alone.
 - Weight adaptation learns from the top-k only (chunks the system already chose), so it refines the ranking rather than discovering evidence it never retrieved.
 - The training cycles repeat the same questions; the held-out paraphrase test is what shows transfer.
 - arXiv keyword search is the recall ceiling: a paper the API does not return cannot be ranked.
