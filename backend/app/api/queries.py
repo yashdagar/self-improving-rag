@@ -48,6 +48,7 @@ def build_query_detail(record: QueryRecord) -> QueryDetail:
         ),
         experiment_run=record.experiment_run,
         cycle=record.cycle,
+        phase=record.phase,
         created_at=record.created_at,
         retrieved=[
             RetrievedChunkOut(

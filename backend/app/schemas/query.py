@@ -77,6 +77,7 @@ class QueryDetail(BaseModel):
     latency: Latency
     experiment_run: str | None
     cycle: int | None
+    phase: str | None
     created_at: datetime
     retrieved: list[RetrievedChunkOut]
     citations: list[CitationOut]

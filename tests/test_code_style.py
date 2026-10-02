@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-SKIP_DIRS = {".venv", "node_modules", "dist", ".git", "data", "__pycache__", ".pytest_cache"}
+SKIP_DIRS = {".claude", ".venv", "node_modules", "dist", ".git", "data", "__pycache__", ".pytest_cache"}
 PRAGMAS = ("noqa", "type: ignore", "pragma: no cover", "eslint-disable")
 HASH_SUFFIXES = {".sh", ".yml", ".yaml", ".toml", ".ini", ".cfg"}
 SLASH_SUFFIXES = {".js", ".jsx", ".ts", ".tsx", ".css"}

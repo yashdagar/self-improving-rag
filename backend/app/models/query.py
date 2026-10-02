@@ -45,6 +45,7 @@ class QueryRecord(Base):
 
     experiment_run: Mapped[str | None] = mapped_column(String(64), index=True)
     cycle: Mapped[int | None]
+    phase: Mapped[str | None] = mapped_column(String(8))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
 
     retrieved: Mapped[list["RetrievedChunk"]] = relationship(

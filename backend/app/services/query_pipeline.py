@@ -103,6 +103,7 @@ class QueryPipeline:
         max_results: int | None = None,
         recency_days: int | None = None,
         learn: bool = True,
+        phase: str | None = None,
     ) -> QueryRecord:
         started = time.perf_counter()
         record = QueryRecord(
@@ -114,6 +115,7 @@ class QueryPipeline:
             gamma=0.0,
             experiment_run=experiment_run,
             cycle=cycle,
+            phase=phase,
         )
         session.add(record)
         session.commit()
