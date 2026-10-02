@@ -58,6 +58,7 @@ class RetrievalPipeline:
         max_results: int | None = None,
         recency_days: int | None = None,
         exclude_query_id: int | None = None,
+        experiment_run: str | None = None,
     ) -> RetrievalOutcome:
         timings: dict[str, float] = {}
 
@@ -98,8 +99,12 @@ class RetrievalPipeline:
             self.settings.feedback_prior_strength,
             self.settings.feedback_similarity_threshold,
             exclude_query_id,
+            experiment_run,
         )
-        weights = current_weights(session, self.settings) if mode == "proposed" else BASELINE_WEIGHTS
+        if mode == "proposed":
+            weights = current_weights(session, self.settings, experiment_run)
+        else:
+            weights = BASELINE_WEIGHTS
         scored = score_candidates(candidates, weights, feedback, utcnow(), self.settings.recency_half_life_days)
         selected = select_top(scored, self.settings.retrieval_top_k, self.settings.max_chunks_per_paper)
         timings["ranking"] = (time.perf_counter() - started) * 1000

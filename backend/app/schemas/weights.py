@@ -17,6 +17,7 @@ class WeightSnapshotOut(BaseModel):
     beta: float
     gamma: float
     trigger: str
+    experiment_run: str | None
     query_id: int | None
     signal: float | None
     note: str | None

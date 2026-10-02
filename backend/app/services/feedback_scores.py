@@ -32,13 +32,27 @@ def similarity_kernel(similarity: float, threshold: float) -> float:
     return (similarity - threshold) / (1.0 - threshold)
 
 
-def collect_signals(session: Session, chunk_ids: list[str], exclude_query_id: int | None) -> list[Signal]:
+def learning_queries(session: Session, experiment_run: str | None) -> set[int]:
+    scope = QueryRecord.experiment_run.is_(None) if experiment_run is None else (
+        QueryRecord.experiment_run == experiment_run
+    )
+    stmt = select(QueryRecord.id).where(QueryRecord.mode == "proposed", QueryRecord.status == "completed", scope)
+    return set(session.scalars(stmt))
+
+
+def collect_signals(
+    session: Session,
+    chunk_ids: list[str],
+    exclude_query_id: int | None,
+    experiment_run: str | None = None,
+) -> list[Signal]:
     if not chunk_ids:
         return []
     signals: list[Signal] = []
+    allowed = learning_queries(session, experiment_run) - {exclude_query_id}
 
     def keep(query_id: int) -> bool:
-        return query_id != exclude_query_id
+        return query_id in allowed
 
     for feedback in session.scalars(select(Feedback).where(Feedback.chunk_id.in_(chunk_ids))):
         if keep(feedback.query_id):
@@ -82,8 +96,9 @@ def feedback_scores(
     prior_strength: float,
     similarity_threshold: float,
     exclude_query_id: int | None = None,
+    experiment_run: str | None = None,
 ) -> dict[str, float]:
-    signals = collect_signals(session, chunk_ids, exclude_query_id)
+    signals = collect_signals(session, chunk_ids, exclude_query_id, experiment_run)
     query_ids = {s.query_id for s in signals}
     rows = session.execute(select(QueryRecord.id, QueryRecord.embedding).where(QueryRecord.id.in_(query_ids)))
     embeddings = dict(rows.tuples().all())

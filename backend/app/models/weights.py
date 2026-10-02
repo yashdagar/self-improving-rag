@@ -17,6 +17,7 @@ class WeightSnapshot(Base):
     beta: Mapped[float]
     gamma: Mapped[float]
     trigger: Mapped[str] = mapped_column(String(16))
+    experiment_run: Mapped[str | None] = mapped_column(String(64), index=True)
     query_id: Mapped[int | None] = mapped_column(ForeignKey("queries.id", ondelete="SET NULL"))
     signal: Mapped[float | None]
     note: Mapped[str | None] = mapped_column(Text)

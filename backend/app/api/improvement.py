@@ -14,11 +14,19 @@ router = APIRouter(prefix="/improvement", tags=["improvement"])
 @router.get("/history", response_model=ImprovementHistory)
 def improvement_history(
     limit: int = Query(200, ge=1, le=5000),
+    experiment_run: str | None = None,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_app_settings),
 ) -> ImprovementHistory:
-    newest = db.scalars(select(WeightSnapshot).order_by(WeightSnapshot.id.desc()).limit(limit)).all()
-    weights = current_weights(db, settings)
+    scope = (
+        WeightSnapshot.experiment_run.is_(None)
+        if experiment_run is None
+        else WeightSnapshot.experiment_run == experiment_run
+    )
+    newest = db.scalars(
+        select(WeightSnapshot).where(scope).order_by(WeightSnapshot.id.desc()).limit(limit)
+    ).all()
+    weights = current_weights(db, settings, experiment_run)
     return ImprovementHistory(
         current=Weights(alpha=weights.alpha, beta=weights.beta, gamma=weights.gamma),
         weight_min=settings.weight_min,

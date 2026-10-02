@@ -14,26 +14,34 @@ class RankingWeights:
     gamma: float
 
 
-def latest_snapshot(session: Session) -> WeightSnapshot | None:
-    return session.scalars(select(WeightSnapshot).order_by(WeightSnapshot.id.desc()).limit(1)).first()
+def initial_weights(settings: Settings) -> RankingWeights:
+    return RankingWeights(settings.alpha_init, settings.beta_init, settings.gamma_init)
 
 
-def current_weights(session: Session, settings: Settings) -> RankingWeights:
-    snapshot = latest_snapshot(session)
+def latest_snapshot(session: Session, experiment_run: str | None = None) -> WeightSnapshot | None:
+    stmt = select(WeightSnapshot).where(WeightSnapshot.experiment_run.is_(None) if experiment_run is None
+                                        else WeightSnapshot.experiment_run == experiment_run)
+    return session.scalars(stmt.order_by(WeightSnapshot.id.desc()).limit(1)).first()
+
+
+def current_weights(session: Session, settings: Settings, experiment_run: str | None = None) -> RankingWeights:
+    snapshot = latest_snapshot(session, experiment_run)
     if snapshot is None:
-        return RankingWeights(settings.alpha_init, settings.beta_init, settings.gamma_init)
+        return initial_weights(settings)
     return RankingWeights(snapshot.alpha, snapshot.beta, snapshot.gamma)
 
 
-def ensure_initial_snapshot(session: Session, settings: Settings) -> None:
-    if session.scalar(select(func.count()).select_from(WeightSnapshot)):
+def ensure_initial_snapshot(session: Session, settings: Settings, experiment_run: str | None = None) -> None:
+    if latest_snapshot(session, experiment_run) is not None:
         return
+    weights = initial_weights(settings)
     session.add(
         WeightSnapshot(
-            alpha=settings.alpha_init,
-            beta=settings.beta_init,
-            gamma=settings.gamma_init,
+            alpha=weights.alpha,
+            beta=weights.beta,
+            gamma=weights.gamma,
             trigger="init",
+            experiment_run=experiment_run,
             note="seeded from settings",
         )
     )
