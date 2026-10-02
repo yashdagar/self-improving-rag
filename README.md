@@ -186,7 +186,7 @@ Requires Python 3.11+, Node 20+, and an LLM (an Anthropic API key, or a local mo
 ```bash
 ./scripts/setup.sh                            # .venv, Python + Node deps, git hooks, .env from .env.example
 .venv/bin/python scripts/download_models.py   # optional: fetch the embedding model ahead of time
-./scripts/dev.sh                              # backend :8000, dashboard http://localhost:5173
+BACKEND_PORT=8000 ./scripts/dev.sh            # backend on BACKEND_PORT, dashboard http://localhost:5173
 ```
 
 **Claude (default):** set `LLM_API_KEY=` in `.env` (or export `ANTHROPIC_API_KEY`).
