@@ -29,3 +29,14 @@ def test_defaults_are_valid():
 def test_invalid_settings_are_rejected(overrides):
     with pytest.raises(ValidationError):
         make(**overrides)
+
+
+def test_env_example_is_valid(tmp_path):
+    from pathlib import Path
+
+    example = Path(__file__).resolve().parents[1] / ".env.example"
+    settings = Settings(_env_file=example, data_dir=tmp_path)
+    assert settings.llm_effort is None
+    assert settings.evaluator_provider is None
+    assert settings.llm_api_key is None
+    assert settings.llm_provider == "anthropic"
