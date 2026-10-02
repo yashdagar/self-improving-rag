@@ -1,27 +1,33 @@
-const WEIGHTS = [
-  { key: "alpha", label: "α semantic" },
-  { key: "beta", label: "β recency" },
-  { key: "gamma", label: "γ feedback" },
-];
+import { WEIGHT_SERIES, decimal } from "../services/format.js";
 
-export default function RankingWeights({ history }) {
+export default function RankingWeights({ history, used, scope }) {
   const { current, weight_min, weight_max, learning_rate, snapshots } = history;
+  const updates = snapshots.filter((snapshot) => snapshot.trigger !== "init").length;
   return (
     <section className="card">
       <h2 className="headline-sm">Ranking weights</h2>
+      <p className="body-sm muted">{scope ? `Current weights in ${scope}.` : "Current weights for live usage."}</p>
       <p className="body-sm muted">
-        Current values after {snapshots.length - 1} updates, bounded to [{weight_min}, {weight_max}],
-        learning rate {learning_rate}
+        Final score = α·semantic + β·recency + γ·feedback. {updates} update{updates === 1 ? "" : "s"} so far,
+        bounded to [{weight_min}, {weight_max}], learning rate {learning_rate}.
       </p>
-      {WEIGHTS.map(({ key, label }) => (
-        <div className="weight" key={key}>
-          <span>{label}</span>
+      {WEIGHT_SERIES.map((series) => (
+        <div className="weight" key={series.key}>
+          <span>
+            <span className="swatch" style={{ background: series.color }} />
+            {series.label}
+          </span>
           <div className="bar">
-            <div style={{ width: `${current[key] * 100}%` }} />
+            <div style={{ width: `${current[series.key] * 100}%`, background: series.color }} />
           </div>
-          <span>{current[key].toFixed(2)}</span>
+          <span>{decimal(current[series.key])}</span>
         </div>
       ))}
+      {used && (
+        <p className="body-sm muted">
+          This answer was ranked with α {decimal(used.alpha)}, β {decimal(used.beta)}, γ {decimal(used.gamma)}.
+        </p>
+      )}
     </section>
   );
 }
