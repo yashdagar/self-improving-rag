@@ -91,3 +91,31 @@ def test_questions_file():
     assert len(questions) >= 20
     assert all(q["question"] != q["paraphrase"] for q in questions)
     assert len({q["id"] for q in questions}) == len(questions)
+
+
+def load_plotter():
+    spec = importlib.util.spec_from_file_location("plot_results", RUNNER.parent / "plot_results.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_plotter_builds_report_from_exported_files(client, experiment, settings, db, tmp_path, monkeypatch):
+    runner = load_runner()
+    folder = runner.export(db, settings, "exp", tmp_path)
+    plotter = load_plotter()
+    monkeypatch.setattr("sys.argv", ["plot_results.py", "exp", "--results", str(tmp_path)])
+    plotter.main()
+    for name in ("metrics_by_cycle.png", "weights.png", "retrieval_change.png", "latency.png", "report.md"):
+        assert (folder / name).exists(), name
+    report = (folder / "report.md").read_text()
+    assert "| 1 | train | baseline | 1 |" in report
+    assert "| overall | 0.300 | 0.600 | +0.300 |" in report
+    assert (folder / "test_comparison.png").exists()
+
+
+def test_bootstrap_ci_brackets_the_mean():
+    plotter = load_plotter()
+    low, high = plotter.bootstrap_ci([0.1, 0.2, 0.3, 0.4])
+    assert low <= 0.25 <= high
+    assert plotter.bootstrap_ci([]) is None
