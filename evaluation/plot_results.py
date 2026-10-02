@@ -274,8 +274,14 @@ def write_report(summary, rows, stats, charts, folder: Path) -> Path:
             f"{fmt(m['evidence_coverage'])} | {fmt(m['overall'])} | {fmt(latency)} |"
         )
     lines += ["", "## Ranking weights at the end of each cycle", "", "| after | α | β | γ |", "|---|---|---|---|"]
+    test_cycles = {c["cycle"] for c in summary["cycles"] if c["phase"] == "test"}
     for w in summary["weights"]:
-        label = "start" if w["cycle"] < 0 else f"cycle {w['cycle'] + 1}"
+        if w["cycle"] < 0:
+            label = "start"
+        elif w["cycle"] in test_cycles:
+            label = "test (frozen)"
+        else:
+            label = f"cycle {w['cycle'] + 1}"
         lines.append(f"| {label} | {w['alpha']:.3f} | {w['beta']:.3f} | {w['gamma']:.3f} |")
     if summary.get("retrieval_change"):
         lines += ["", "## Retrieval change between cycles", "", "| cycles | mean top-k Jaccard | questions |",
