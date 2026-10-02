@@ -21,8 +21,9 @@ split into numbered claims with the evidence numbers each claim cites.
 Judge only from the text supplied. Do not use outside knowledge to decide whether a claim is true; decide \
 whether the cited excerpt states or directly implies it.
 
-1. For every evidence excerpt, rate its relevance to the question: "relevant" if it directly helps answer \
-it, "partial" if it is on topic but only tangentially useful, "irrelevant" otherwise.
+1. For every evidence excerpt, rate its relevance to the question itself, regardless of whether the answer \
+used it: "relevant" if it contains information that directly helps answer the question, "partial" if it is \
+on topic but only tangentially useful, "irrelevant" otherwise.
 2. For every claim, say whether it is factual (asserts something about methods, results or findings) or \
 not (a transition, a caveat about missing evidence, or a restatement of the question). For every \
 citation attached to a claim, judge whether that excerpt "supported" the claim fully, "partial"ly, or \

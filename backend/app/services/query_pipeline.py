@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.models import Citation, QueryRecord, RetrievedChunk
+from app.services.adaptation import WeightAdapter
 from app.services.citations import map_citations
+from app.services.evaluation import SelfEvaluator
 from app.services.generation import AnswerGenerator, EvidenceItem
 from app.services.retrieval_pipeline import RetrievalOutcome, RetrievalPipeline
 
@@ -35,11 +37,19 @@ def build_evidence(outcome: RetrievalOutcome) -> list[EvidenceItem]:
 
 
 class QueryPipeline:
-    def __init__(self, settings: Settings, retrieval: RetrievalPipeline, generator: AnswerGenerator):
+    def __init__(
+        self,
+        settings: Settings,
+        retrieval: RetrievalPipeline,
+        generator: AnswerGenerator,
+        evaluator: SelfEvaluator | None = None,
+        adapter: WeightAdapter | None = None,
+    ):
         self.settings = settings
         self.retrieval = retrieval
         self.generator = generator
-        self.post_processors: list = []
+        self.evaluator = evaluator
+        self.adapter = adapter
 
     def _store_retrieval(self, record: QueryRecord, outcome: RetrievalOutcome) -> None:
         record.keywords = outcome.arxiv.query.keywords
@@ -92,6 +102,7 @@ class QueryPipeline:
         cycle: int | None = None,
         max_results: int | None = None,
         recency_days: int | None = None,
+        learn: bool = True,
     ) -> QueryRecord:
         started = time.perf_counter()
         record = QueryRecord(
@@ -117,8 +128,10 @@ class QueryPipeline:
             record.status = "completed"
             record.total_ms = (time.perf_counter() - started) * 1000
             session.commit()
-            for processor in self.post_processors:
-                processor(session, record, evidence)
+            if self.evaluator is not None:
+                self.evaluator(session, record, evidence)
+            if learn and self.adapter is not None:
+                self.adapter.update(session, record, "evaluation")
             record.total_ms = (time.perf_counter() - started) * 1000
             session.commit()
         except Exception as exc:

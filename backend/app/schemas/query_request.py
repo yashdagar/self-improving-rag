@@ -10,3 +10,4 @@ class QueryRequest(BaseModel):
     cycle: int | None = Field(None, ge=0)
     max_results: int | None = Field(None, ge=1, le=100)
     recency_days: int | None = Field(None, ge=1)
+    learn: bool = True

@@ -96,7 +96,7 @@ def run_query(
         raise HTTPException(status_code=503, detail="LLM is not configured, set LLM_API_KEY or LLM_BASE_URL")
     record = services.query_pipeline.run(
         db, payload.query, payload.mode, payload.experiment_run, payload.cycle,
-        payload.max_results, payload.recency_days,
+        payload.max_results, payload.recency_days, payload.learn,
     )
     detail = build_query_detail(record)
     if record.status == "failed":

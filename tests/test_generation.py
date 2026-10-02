@@ -146,6 +146,8 @@ def rag_client(settings):
                     NOW - timedelta(days=900)),
         arxiv_paper("2601.00002", "Verification in speculative decoding",
                     "Speculative decoding verification keeps the target distribution.", NOW - timedelta(days=30)),
+        arxiv_paper("2401.00003", "Draft model design", "Draft models for speculative decoding trade depth for width.",
+                    NOW - timedelta(days=300)),
     ]
     llm = ScriptedLLM(cite_first_two)
     judge = ScriptedLLM(judge_everything_supported)
@@ -218,3 +220,15 @@ def test_evaluation_failure_keeps_answer(rag_client):
     assert body["status"] == "completed"
     assert body["evaluation"] is None
     assert "evaluation failed" in body["error"]
+
+
+def test_proposed_queries_adapt_weights_unless_frozen(rag_client):
+    def snapshots():
+        return rag_client.get("/api/improvement/history").json()["snapshots"]
+
+    rag_client.post("/api/query", json={"query": "How does speculative decoding work?", "learn": False})
+    assert len(snapshots()) == 1
+    rag_client.post("/api/query", json={"query": "How does speculative decoding work?", "mode": "baseline"})
+    assert len(snapshots()) == 1
+    rag_client.post("/api/query", json={"query": "How does speculative decoding work?"})
+    assert [s["trigger"] for s in snapshots()] == ["init", "evaluation"]

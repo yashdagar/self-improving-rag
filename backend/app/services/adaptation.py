@@ -151,9 +151,6 @@ class WeightAdapter:
         logger.info("weight update after query %s (%s): %s", record.id, trigger, update.reason)
         return update
 
-    def __call__(self, session: Session, record: QueryRecord, evidence) -> None:
-        self.update(session, record, "evaluation")
-
     def on_feedback(self, session: Session, record: QueryRecord, rating: int, chunk_id: str | None) -> Update | None:
         label = 1.0 if rating > 0 else 0.0
         if chunk_id is not None:

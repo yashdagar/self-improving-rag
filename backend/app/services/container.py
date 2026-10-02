@@ -43,9 +43,8 @@ def build_services(
     adapter = WeightAdapter(settings)
     query_pipeline = None
     if llm is not None:
-        query_pipeline = QueryPipeline(settings, retrieval, AnswerGenerator(llm))
         judge = evaluator_llm or (build_llm(settings, settings.evaluator_model) if settings.evaluator_model else llm)
-        query_pipeline.post_processors.extend([SelfEvaluator(judge), adapter])
+        query_pipeline = QueryPipeline(settings, retrieval, AnswerGenerator(llm), SelfEvaluator(judge), adapter)
     return Services(
         paper_retriever=paper_retriever,
         document_processor=document_processor,
