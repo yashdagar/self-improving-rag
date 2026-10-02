@@ -82,6 +82,7 @@ class OpenAICompatibleLLM:
         headers = {"Authorization": f"Bearer {endpoint.api_key}"} if endpoint.api_key else {}
         self.http = http or httpx.Client(timeout=settings.llm_timeout_seconds, headers=headers)
         self.url = f"{endpoint.base_url.rstrip('/')}/chat/completions"
+        self.json_mode = True
 
     def _complete(self, messages: list[dict]) -> str:
         payload = {
@@ -89,12 +90,17 @@ class OpenAICompatibleLLM:
             "messages": messages,
             "temperature": self.settings.llm_temperature,
             "max_tokens": self.settings.llm_max_tokens,
-            "response_format": {"type": "json_object"},
         }
+        if self.json_mode:
+            payload["response_format"] = {"type": "json_object"}
         try:
             response = self.http.post(self.url, json=payload)
         except httpx.HTTPError as exc:
             raise LLMError(f"cannot reach {self.url}: {exc}") from exc
+        if response.status_code == 400 and self.json_mode:
+            logger.info("endpoint rejected JSON mode, retrying with the schema in the prompt only")
+            self.json_mode = False
+            return self._complete(messages)
         if response.status_code != 200:
             raise LLMError(f"LLM endpoint returned HTTP {response.status_code}: {response.text[:300]}")
         choice = response.json()["choices"][0]

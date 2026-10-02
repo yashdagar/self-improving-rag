@@ -275,3 +275,20 @@ def test_status_reports_evaluator(settings):
     assert components["llm"]["detail"] == "openai_compatible:grok-model"
     assert components["evaluator"]["detail"] == "openai_compatible:gemini-model"
     assert "gemini-key" not in str(components) and "xai-key" not in str(components)
+
+
+def test_openai_compatible_falls_back_without_json_mode(settings):
+    seen = []
+
+    def handler(request):
+        body = json.loads(request.content)
+        seen.append("response_format" in body)
+        if "response_format" in body:
+            return httpx.Response(400, json={"error": "response_format not supported"})
+        content = json.dumps({"answer": "ok", "insufficient_evidence": True})
+        return httpx.Response(200, json={"choices": [{"message": {"content": content}, "finish_reason": "stop"}]})
+
+    llm = OpenAICompatibleLLM(openai_settings(settings), http=httpx.Client(transport=httpx.MockTransport(handler)))
+    assert llm.structured("s", "p", GeneratedAnswer).answer == "ok"
+    llm.structured("s", "p", GeneratedAnswer)
+    assert seen == [True, False, False]
