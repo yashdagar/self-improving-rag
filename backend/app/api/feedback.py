@@ -1,15 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_db, get_services
 from app.models import Feedback, QueryRecord
 from app.schemas.feedback import FeedbackCreate, FeedbackOut
+from app.services.container import Services
 
 router = APIRouter(prefix="/feedback", tags=["feedback"])
 
 
 @router.post("", response_model=FeedbackOut, status_code=status.HTTP_201_CREATED)
-def create_feedback(payload: FeedbackCreate, db: Session = Depends(get_db)) -> FeedbackOut:
+def create_feedback(
+    payload: FeedbackCreate,
+    db: Session = Depends(get_db),
+    services: Services = Depends(get_services),
+) -> FeedbackOut:
     record = db.get(QueryRecord, payload.query_id)
     if record is None:
         raise HTTPException(status_code=404, detail=f"query {payload.query_id} not found")
@@ -21,4 +26,5 @@ def create_feedback(payload: FeedbackCreate, db: Session = Depends(get_db)) -> F
     feedback = Feedback(**payload.model_dump())
     db.add(feedback)
     db.commit()
+    services.adapter.on_feedback(db, record, payload.rating, payload.chunk_id)
     return FeedbackOut.model_validate(feedback)

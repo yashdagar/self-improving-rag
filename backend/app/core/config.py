@@ -66,6 +66,7 @@ class Settings(BaseSettings):
     weight_min: float = Field(0.05, ge=0, le=1)
     weight_max: float = Field(0.90, ge=0, le=1)
     weight_learning_rate: float = Field(0.10, gt=0, le=0.5)
+    adaptation_min_labels: int = Field(3, ge=2)
     recency_half_life_days: float = Field(365.0, gt=0)
     max_chunks_per_paper: int = Field(3, ge=1)
     feedback_prior_strength: float = Field(2.0, gt=0)

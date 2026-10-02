@@ -21,6 +21,7 @@ class WeightSnapshotOut(BaseModel):
     query_id: int | None
     signal: float | None
     note: str | None
+    details: dict | None
     created_at: datetime
 
 

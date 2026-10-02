@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from app.core.config import Settings
+from app.services.adaptation import WeightAdapter
 from app.services.document_processor import DocumentProcessor
 from app.services.embeddings import Embedder, SentenceTransformerEmbedder
 from app.services.evaluation import SelfEvaluator
@@ -23,6 +24,7 @@ class Services:
     retrieval: RetrievalPipeline
     llm: LLMClient | None
     query_pipeline: QueryPipeline | None
+    adapter: WeightAdapter
 
 
 def build_services(
@@ -38,11 +40,12 @@ def build_services(
     indexer = Indexer(vector_store)
     retrieval = RetrievalPipeline(settings, paper_retriever, document_processor, indexer, vector_store, embedder)
     llm = llm or build_llm(settings)
+    adapter = WeightAdapter(settings)
     query_pipeline = None
     if llm is not None:
         query_pipeline = QueryPipeline(settings, retrieval, AnswerGenerator(llm))
         judge = evaluator_llm or (build_llm(settings, settings.evaluator_model) if settings.evaluator_model else llm)
-        query_pipeline.post_processors.append(SelfEvaluator(judge))
+        query_pipeline.post_processors.extend([SelfEvaluator(judge), adapter])
     return Services(
         paper_retriever=paper_retriever,
         document_processor=document_processor,
@@ -52,4 +55,5 @@ def build_services(
         retrieval=retrieval,
         llm=llm,
         query_pipeline=query_pipeline,
+        adapter=adapter,
     )
