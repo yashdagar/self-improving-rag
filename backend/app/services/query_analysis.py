@@ -11,7 +11,7 @@ STOPWORDS = frozenset(
     with would you your
     approach approaches compare compared comparison current effective effectiveness explain exist exists
     affect affects recent recently method methods technique techniques use used using way ways work
-    works paper papers research state art latest new advance advances role impact much many like
+    works paper papers research art latest new advance advances role impact much many like
     """.split()
 )
 

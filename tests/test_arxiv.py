@@ -167,3 +167,9 @@ def test_search_endpoint(fast_settings, services):
         assert body["keywords"] == ["graph", "neural", "networks"]
         assert body["papers"][0]["id"] == "2501.00001"
         assert client.get("/api/arxiv/search", params={"q": "what is the"}).status_code == 422
+
+
+def test_keywords_keep_domain_terms():
+    assert extract_keywords("How do state space models compare to transformers?", 5) == [
+        "state", "space", "models", "transformers",
+    ]
