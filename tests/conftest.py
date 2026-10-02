@@ -14,6 +14,7 @@ def settings(tmp_path):
         environment="test",
         data_dir=tmp_path / "data",
         arxiv_request_delay_seconds=0,
+        arxiv_backoff_seconds=0,
         pdf_download_delay_seconds=0,
     )
     settings.ensure_dirs()

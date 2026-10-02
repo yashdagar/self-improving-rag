@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     arxiv_request_delay_seconds: float = Field(3.0, ge=0)
     arxiv_api_url: str = "https://export.arxiv.org/api/query"
     arxiv_timeout_seconds: float = Field(30.0, gt=0)
+    arxiv_max_attempts: int = Field(5, ge=1, le=10)
+    arxiv_backoff_seconds: float = Field(10.0, ge=0)
     arxiv_cache_ttl_hours: float = Field(24.0, ge=0)
     arxiv_min_results: int = Field(5, ge=0)
     arxiv_max_keywords: int = Field(5, ge=1, le=10)

@@ -128,10 +128,16 @@ class ArxivClient:
     _lock = threading.Lock()
     _last_request = 0.0
 
-    def __init__(self, settings: Settings, http: httpx.Client | None = None, max_attempts: int = 3):
+    def __init__(self, settings: Settings, http: httpx.Client | None = None):
         self.settings = settings
         self.http = http or httpx.Client(timeout=settings.arxiv_timeout_seconds, follow_redirects=True)
-        self.max_attempts = max_attempts
+        self.max_attempts = settings.arxiv_max_attempts
+
+    def _backoff(self, attempt: int, response: httpx.Response | None) -> float:
+        retry_after = response.headers.get("retry-after") if response is not None else None
+        if retry_after and retry_after.isdigit():
+            return min(float(retry_after), 300.0)
+        return self.settings.arxiv_backoff_seconds * 2 ** (attempt - 1)
 
     def _wait_for_slot(self) -> None:
         with ArxivClient._lock:
@@ -152,6 +158,7 @@ class ArxivClient:
         last_error: Exception | None = None
         for attempt in range(1, self.max_attempts + 1):
             self._wait_for_slot()
+            response = None
             try:
                 response = self.http.get(self.settings.arxiv_api_url, params=params)
             except httpx.HTTPError as exc:
@@ -162,6 +169,12 @@ class ArxivClient:
                 last_error = ArxivError(f"arXiv returned HTTP {response.status_code}")
                 if response.status_code not in RETRY_STATUSES:
                     break
-            logger.warning("arXiv request failed (attempt %d/%d): %s", attempt, self.max_attempts, last_error)
-            time.sleep(self.settings.arxiv_request_delay_seconds * attempt)
+            if attempt == self.max_attempts:
+                break
+            wait = self._backoff(attempt, response)
+            logger.warning(
+                "arXiv request failed (attempt %d/%d): %s, retrying in %.0fs",
+                attempt, self.max_attempts, last_error, wait,
+            )
+            time.sleep(wait)
         raise ArxivError(str(last_error))

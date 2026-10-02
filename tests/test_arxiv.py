@@ -113,6 +113,15 @@ def test_client_retries_then_succeeds(fast_settings):
     assert calls[1].url.params["max_results"] == "5"
 
 
+def test_client_honours_retry_after(fast_settings, monkeypatch):
+    waits = []
+    monkeypatch.setattr("app.services.arxiv_client.time.sleep", waits.append)
+    responses = iter([httpx.Response(429, headers={"retry-after": "7"}), httpx.Response(200, text=FEED)])
+    client = ArxivClient(fast_settings, httpx.Client(transport=httpx.MockTransport(lambda r: next(responses))))
+    client.search("all:rag", 5)
+    assert 7.0 in waits
+
+
 def test_client_gives_up_on_client_error(fast_settings):
     client = ArxivClient(fast_settings, httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(400))))
     with pytest.raises(ArxivError):
