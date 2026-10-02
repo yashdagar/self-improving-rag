@@ -4,17 +4,229 @@ A retrieval-augmented generation system that answers AI/ML research questions fr
 
 ## Contents
 
+- [Quick start](#quick-start)
 - [Pipeline](#pipeline)
 - [How each stage works](#how-each-stage-works)
 - [The self-improvement mechanism](#the-self-improvement-mechanism)
 - [Baseline vs proposed](#baseline-vs-proposed)
 - [Experiments](#experiments)
-- [Setup](#setup)
 - [API](#api)
 - [Project layout](#project-layout)
 - [Configuration](#configuration)
 - [Testing and conventions](#testing-and-conventions)
 - [Limitations](#limitations)
+
+## Quick start
+
+Seven steps from a fresh machine to a running dashboard. Steps 1 to 4 take about 10 minutes, most of it downloads.
+
+### Step 1: install the prerequisites
+
+You need three tools. Check what you already have:
+
+```bash
+git --version        # any version
+python3 --version    # 3.11 or newer
+node --version       # 20 or newer
+```
+
+Install anything missing:
+
+- **Git:** https://git-scm.com/downloads
+- **Python 3.11+:** https://www.python.org/downloads (on macOS `brew install python@3.12` also works)
+- **Node.js 20+:** https://nodejs.org (the LTS version)
+
+On Windows, the simplest route is [Docker](#run-with-docker-instead) or WSL (`wsl --install`, then follow these steps inside Ubuntu). Manual Windows commands are under [Windows without Docker](#windows-without-docker).
+
+### Step 2: download the project and run setup
+
+```bash
+git clone https://github.com/yashdagar/self-improving-rag.git
+cd self-improving-rag
+./scripts/setup.sh
+```
+
+`setup.sh` does everything once:
+
+1. copies `.env.example` to `.env` (your private settings file, never committed)
+2. creates a Python environment in `.venv` and installs the backend libraries (PyTorch, ChromaDB, PyMuPDF and so on, about 1 GB)
+3. installs the dashboard's Node packages
+4. downloads the embedding model (about 90 MB)
+5. turns on the commit message check
+
+It ends with `Done. Next:`. If it stops with an error, see [Troubleshooting](#troubleshooting).
+
+### Step 3: choose an LLM and put its key in `.env`
+
+The system needs one LLM to write answers, and optionally a second one to judge them. Open `.env` in any editor and fill in **one** of the options below. Leave every other line as it is.
+
+**Option A: Grok answers, Gemini judges (recommended).** Two different providers means the judge does not share the writer's blind spots.
+
+1. Get a Grok key at https://console.x.ai (API Keys)
+2. Get a Gemini key at https://aistudio.google.com/apikey (free tier available)
+
+```env
+LLM_PROVIDER=openai_compatible
+LLM_BASE_URL=https://api.x.ai/v1
+LLM_MODEL=grok-4.7
+LLM_API_KEY=xai-paste-your-key-here
+
+EVALUATOR_PROVIDER=openai_compatible
+EVALUATOR_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+EVALUATOR_MODEL=gemini-3.8-flash
+EVALUATOR_API_KEY=paste-your-gemini-key-here
+```
+
+**Option B: Gemini only (free).** Same Gemini key for both roles.
+
+```env
+LLM_PROVIDER=openai_compatible
+LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+LLM_MODEL=gemini-3.8-flash
+LLM_API_KEY=paste-your-gemini-key-here
+```
+
+**Option C: Claude.** Get a key at https://console.anthropic.com.
+
+```env
+LLM_PROVIDER=anthropic
+LLM_MODEL=claude-opus-5
+LLM_API_KEY=sk-ant-paste-your-key-here
+```
+
+**Option D: fully offline with Ollama (no key, slower).** Needs about 6 GB of free RAM.
+
+```bash
+brew install ollama                           # or https://ollama.com/download
+OLLAMA_CONTEXT_LENGTH=16384 ollama serve      # keep this terminal open
+ollama pull qwen2.5:7b-instruct               # in a second terminal, 4.7 GB once
+```
+
+```env
+LLM_PROVIDER=openai_compatible
+LLM_BASE_URL=http://localhost:11434/v1
+LLM_MODEL=qwen2.5:7b-instruct
+LLM_MAX_TOKENS=2000
+```
+
+Model names change over time. To see the names your key can use:
+
+```bash
+curl https://api.x.ai/v1/models -H "Authorization: Bearer YOUR_XAI_KEY"
+curl https://generativelanguage.googleapis.com/v1beta/openai/models -H "Authorization: Bearer YOUR_GEMINI_KEY"
+```
+
+Any other OpenAI-compatible service (Groq, OpenRouter, OpenAI, vLLM) works the same way: set `LLM_PROVIDER=openai_compatible`, its base URL, a model name and your key.
+
+### Step 4: start the app
+
+```bash
+./scripts/dev.sh
+```
+
+This starts the backend API on port 8000 and the dashboard on port 5173. Open **http://localhost:5173**. Stop both with `Ctrl+C`.
+
+If port 8000 is already used by another program, pick another one:
+
+```bash
+BACKEND_PORT=8100 ./scripts/dev.sh
+```
+
+Open the **System** page first. Every row should say `ok`. If `llm` says `not configured`, recheck step 3 and restart `dev.sh`.
+
+### Step 5: ask a research question
+
+On the **Research** page, type a question such as *How does speculative decoding speed up LLM inference?* and press **Ask**. Keep **Self-improving** selected.
+
+The first question takes one to three minutes, because the system searches arXiv, downloads and reads PDFs, and embeds them. Repeat questions on the same topic are much faster since everything is cached in `data/`.
+
+You will see:
+
+- the answer, with numbered citations; click a number to jump to its evidence
+- each evidence chunk with its paper, section, page and its α·semantic + β·recency + γ·feedback score bar
+- the self-evaluation scores with the judge's reasons
+- the ranking weights that were used
+
+Use **Inspect retrieval only** to see the ranking without calling the LLM, and switch to **Baseline** to compare.
+
+### Step 6: give feedback and watch the system learn
+
+Press 👍 or 👎 on the answer, or on a single evidence chunk. Then open **Improvement history**: every self-evaluation and every 👍/👎 adds a row showing how α, β and γ moved and why (the slopes). Ask related questions again and the ranking will reflect what it learned.
+
+### Step 7: run the Baseline vs Self-Improving experiment
+
+With the app stopped or running, in a new terminal from the project folder:
+
+```bash
+.venv/bin/python evaluation/run_experiment.py --run-id my-first-run --limit 6 --cycles 2 --test-limit 3
+.venv/bin/python evaluation/plot_results.py my-first-run
+```
+
+That small run (6 questions, 2 cycles, 3 held-out paraphrases, about 24 LLM-backed queries) takes 10 to 40 minutes depending on the LLM. The full experiment drops the limits:
+
+```bash
+.venv/bin/python evaluation/run_experiment.py --run-id full-run --cycles 3 --test-limit 12
+.venv/bin/python evaluation/plot_results.py full-run
+```
+
+That is 120 queries: about 1 to 2 hours with a cloud LLM, about 3 hours with Ollama on a laptop. Results land in `evaluation/results/<run-id>/` (`report.md`, charts, CSV) and appear on the dashboard's **Experiments** page.
+
+Tips for long runs:
+
+- Keep the laptop awake and the lid open. On macOS, `caffeinate -i .venv/bin/python evaluation/run_experiment.py ...` stops idle sleep.
+- If it is interrupted, run the same command again: finished steps are skipped.
+- Use a new `--run-id` for every fresh experiment. Each run learns from scratch.
+
+### Run with Docker instead
+
+Needs only [Docker Desktop](https://www.docker.com/products/docker-desktop). Do step 3 first (`cp .env.example .env`, then edit it), then:
+
+```bash
+docker compose up --build
+```
+
+Open http://localhost:5173. The first build downloads about 2 GB. With Ollama on your own machine, use `LLM_BASE_URL=http://host.docker.internal:11434/v1`. Data persists in `./data`.
+
+### Windows without Docker
+
+In PowerShell, from the project folder:
+
+```powershell
+copy .env.example .env
+py -3.11 -m venv .venv
+.venv\Scripts\python -m pip install -r backend\requirements-dev.txt
+.venv\Scripts\python scripts\download_models.py
+cd frontend; npm install; cd ..
+```
+
+Then run the two servers in two terminals:
+
+```powershell
+cd backend; ..\.venv\Scripts\uvicorn app.main:app --port 8000
+```
+
+```powershell
+cd frontend; npm run dev
+```
+
+### Troubleshooting
+
+- **`Python 3.11+ is required`:** install a newer Python (step 1), then run `./scripts/setup.sh` again.
+- **`llm: not configured` on the System page:** the key or base URL in `.env` is empty or misspelled. Fix it and restart `dev.sh`.
+- **A question fails with `HTTP 401` or `403`:** the API key is wrong or has no credit.
+- **`HTTP 404` or `model not found`:** the model name is not available to your key. List models with the `curl` commands in step 3.
+- **`arXiv returned HTTP 429`:** arXiv is rate limiting you. The system waits and retries by itself; if it keeps happening, wait a few minutes.
+- **The dashboard shows `Backend unreachable`:** the backend is not running, or it runs on a different port than the dashboard expects. Start both with the same `BACKEND_PORT`.
+- **Answers are cut off or fail with `truncated`:** raise `LLM_MAX_TOKENS` in `.env`.
+- **Errors after pulling new code:** the database schema may have changed. See below.
+
+### Reset everything
+
+All downloaded papers, the vector index, the database and learned weights live in `data/`. To start from zero:
+
+```bash
+rm -rf data/rag.db data/chroma data/papers data/pdfs
+```
 
 ## Pipeline
 
@@ -178,37 +390,6 @@ The protocol:
 - `report.md`: the same numbers as tables, plus paired differences with 95% bootstrap intervals and win/loss counts on the held-out set.
 
 Every number comes from stored query records. Nothing in `evaluation/results/` is written by hand. The same per-cycle aggregates are served at `GET /api/experiments/{run}/cycles` for the dashboard.
-
-## Setup
-
-Requires Python 3.11+, Node 20+, and an LLM (an Anthropic API key, or a local model through Ollama).
-
-```bash
-./scripts/setup.sh                            # .venv, Python + Node deps, git hooks, .env from .env.example
-.venv/bin/python scripts/download_models.py   # optional: fetch the embedding model ahead of time
-BACKEND_PORT=8000 ./scripts/dev.sh            # backend on BACKEND_PORT, dashboard http://localhost:5173
-```
-
-**Claude (default):** set `LLM_API_KEY=` in `.env` (or export `ANTHROPIC_API_KEY`).
-
-**Local model with Ollama:**
-
-```bash
-brew install ollama
-OLLAMA_CONTEXT_LENGTH=16384 ollama serve      # the default 4k context truncates the evidence prompt
-ollama pull qwen2.5:7b-instruct
-```
-
-```env
-LLM_PROVIDER=openai_compatible
-LLM_BASE_URL=http://localhost:11434/v1         # http://host.docker.internal:11434/v1 from Docker
-LLM_MODEL=qwen2.5:7b-instruct
-LLM_MAX_TOKENS=2000
-```
-
-**Docker:** `docker compose up --build` (data, the SQLite DB, Chroma and the model cache persist in `./data`).
-
-The database schema is created on startup. There are no migrations; after pulling schema changes, delete `data/rag.db` and `data/chroma` to start fresh.
 
 ## API
 
