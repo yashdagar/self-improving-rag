@@ -48,3 +48,20 @@ def arxiv_paper(paper_id, title, abstract, published_at, pdf_url=None):
         abs_url=f"https://arxiv.org/abs/{paper_id}",
         pdf_url=pdf_url,
     )
+
+
+class ScriptedLLM:
+    model = "scripted-llm"
+
+    def __init__(self, *responses):
+        self.responses = list(responses)
+        self.prompts = []
+
+    def structured(self, system, prompt, schema):
+        self.prompts.append((system, prompt, schema))
+        response = self.responses.pop(0) if len(self.responses) > 1 else self.responses[0]
+        if isinstance(response, Exception):
+            raise response
+        if callable(response):
+            response = response(prompt)
+        return schema.model_validate(response)

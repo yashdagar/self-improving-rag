@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -49,11 +50,15 @@ class Settings(BaseSettings):
     retrieval_top_k: int = Field(8, ge=1)
 
     llm_provider: Literal["anthropic", "openai_compatible"] = "anthropic"
-    llm_model: str = "claude-sonnet-5"
+    llm_model: str = "claude-opus-5"
     llm_api_key: SecretStr | None = None
     llm_base_url: str | None = None
+    llm_effort: Literal["low", "medium", "high", "xhigh", "max"] | None = None
+    llm_fallbacks: bool = True
     llm_temperature: float = Field(0.0, ge=0, le=1)
-    llm_max_tokens: int = Field(1500, ge=100)
+    llm_max_tokens: int = Field(16000, ge=256)
+    llm_timeout_seconds: float = Field(300.0, gt=0)
+    evaluator_model: str | None = None
 
     alpha_init: float = Field(0.70, ge=0, le=1)
     beta_init: float = Field(0.15, ge=0, le=1)
@@ -82,10 +87,19 @@ class Settings(BaseSettings):
                 raise ValueError(f"{name}={value} is outside [{self.weight_min}, {self.weight_max}]")
         if abs(self.alpha_init + self.beta_init + self.gamma_init - 1) > 1e-6:
             raise ValueError("alpha_init + beta_init + gamma_init must sum to 1")
+        if self.llm_provider == "openai_compatible" and not self.llm_base_url:
+            raise ValueError("LLM_BASE_URL is required when LLM_PROVIDER=openai_compatible")
         unknown = set(self.arxiv_categories) - set(AI_ML_CATEGORIES)
         if unknown:
             raise ValueError(f"unsupported arXiv categories: {sorted(unknown)}")
         return self
+
+    @property
+    def llm_configured(self) -> bool:
+        if self.llm_provider == "openai_compatible":
+            return bool(self.llm_base_url)
+        key = self.llm_api_key.get_secret_value() if self.llm_api_key else ""
+        return bool(key or os.environ.get("ANTHROPIC_API_KEY"))
 
     @property
     def sqlite_path(self) -> Path:

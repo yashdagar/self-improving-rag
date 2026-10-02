@@ -19,15 +19,20 @@ class RetrievedChunkOut(BaseModel):
     recency_score: float
     feedback_score: float
     final_score: float
+    similarity: float
+    judged_relevance: float | None
     cited: bool
 
 
 class CitationOut(BaseModel):
     marker: int
+    claim_index: int
     chunk_id: str
     paper_id: str
     paper_title: str
     claim: str | None
+    supported: bool | None
+    verdict_reason: str | None
 
 
 class EvaluationOut(BaseModel):
@@ -59,6 +64,13 @@ class QueryDetail(BaseModel):
     status: str
     answer: str | None
     insufficient_evidence: bool
+    missing_information: str | None
+    invalid_citations: list[int]
+    total_claims: int
+    uncited_claims: int
+    keywords: list[str]
+    search_query: str | None
+    llm_model: str | None
     error: str | None
     weights: Weights
     latency: Latency

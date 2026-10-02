@@ -31,8 +31,9 @@ def _storage_status(settings: Settings) -> ComponentStatus:
 
 
 def _llm_status(settings: Settings) -> ComponentStatus:
-    if settings.llm_api_key is None or not settings.llm_api_key.get_secret_value():
-        return ComponentStatus(status="not_configured", detail="LLM_API_KEY is not set")
+    if not settings.llm_configured:
+        missing = "LLM_BASE_URL" if settings.llm_provider == "openai_compatible" else "LLM_API_KEY"
+        return ComponentStatus(status="not_configured", detail=f"{missing} is not set")
     return ComponentStatus(status="ok", detail=f"{settings.llm_provider}:{settings.llm_model}")
 
 

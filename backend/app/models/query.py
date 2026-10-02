@@ -27,6 +27,11 @@ class QueryRecord(Base):
     status: Mapped[str] = mapped_column(String(16), default="pending")
     answer: Mapped[str | None] = mapped_column(Text)
     insufficient_evidence: Mapped[bool] = mapped_column(default=False)
+    missing_information: Mapped[str | None] = mapped_column(Text)
+    invalid_citations: Mapped[list[int]] = mapped_column(JSON, default=list)
+    uncited_claims: Mapped[int] = mapped_column(default=0)
+    total_claims: Mapped[int] = mapped_column(default=0)
+    llm_model: Mapped[str | None] = mapped_column(String(128))
     error: Mapped[str | None] = mapped_column(Text)
 
     alpha: Mapped[float]
@@ -46,7 +51,7 @@ class QueryRecord(Base):
         back_populates="query", cascade="all, delete-orphan", order_by="RetrievedChunk.rank"
     )
     citations: Mapped[list["Citation"]] = relationship(
-        back_populates="query", cascade="all, delete-orphan", order_by="Citation.marker"
+        back_populates="query", cascade="all, delete-orphan", order_by=lambda: [Citation.claim_index, Citation.marker]
     )
     evaluation: Mapped["Evaluation | None"] = relationship(
         back_populates="query", cascade="all, delete-orphan", uselist=False
@@ -77,11 +82,11 @@ class RetrievedChunk(Base):
 
 class Citation(Base):
     __tablename__ = "citations"
-    __table_args__ = (UniqueConstraint("query_id", "marker", name="uq_citation_marker"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     query_id: Mapped[int] = mapped_column(ForeignKey("queries.id", ondelete="CASCADE"), index=True)
     marker: Mapped[int]
+    claim_index: Mapped[int] = mapped_column(default=0)
     chunk_id: Mapped[str] = mapped_column(ForeignKey("chunks.id"))
     claim: Mapped[str | None] = mapped_column(Text)
     supported: Mapped[bool | None]
