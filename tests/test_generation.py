@@ -3,6 +3,7 @@ from datetime import timedelta
 from types import SimpleNamespace
 
 import httpx
+from pydantic import SecretStr
 import pytest
 from fastapi.testclient import TestClient
 
@@ -86,7 +87,8 @@ def test_anthropic_uses_fallbacks_for_opus(settings):
 
 def test_anthropic_without_fallbacks_for_other_models(settings):
     client = fake_anthropic(parsed_response(parsed=GeneratedAnswer(answer="a", insufficient_evidence=True)))
-    AnthropicLLM(settings, model="claude-sonnet-5", client=client).structured("s", "p", GeneratedAnswer)
+    sonnet = settings.model_copy(update={"llm_model": "claude-sonnet-5"})
+    AnthropicLLM(sonnet, client=client).structured("s", "p", GeneratedAnswer)
     assert client.messages.calls and not client.beta.messages.calls
 
 
@@ -232,3 +234,44 @@ def test_proposed_queries_adapt_weights_unless_frozen(rag_client):
     assert len(snapshots()) == 1
     rag_client.post("/api/query", json={"query": "How does speculative decoding work?"})
     assert [s["trigger"] for s in snapshots()] == ["init", "evaluation"]
+
+
+def grok_and_gemini(settings):
+    return settings.model_copy(update={
+        "llm_provider": "openai_compatible", "llm_base_url": "https://api.x.ai/v1", "llm_model": "grok-model",
+        "llm_api_key": SecretStr("xai-key"),
+        "evaluator_provider": "openai_compatible", "evaluator_model": "gemini-model",
+        "evaluator_base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "evaluator_api_key": SecretStr("gemini-key"),
+    })
+
+
+def test_separate_evaluator_endpoint(settings):
+    configured = grok_and_gemini(settings)
+    generator, evaluator = configured.generator_endpoint, configured.evaluator_endpoint
+    assert (generator.model, generator.api_key, generator.base_url) == ("grok-model", "xai-key", "https://api.x.ai/v1")
+    assert (evaluator.model, evaluator.api_key) == ("gemini-model", "gemini-key")
+    assert evaluator.base_url.startswith("https://generativelanguage")
+    services = build_services(configured, embedder=HashEmbedder())
+    assert services.query_pipeline.generator.model == "grok-model"
+    assert services.query_pipeline.evaluator.llm.model == "gemini-model"
+    assert services.query_pipeline.evaluator.llm.url.endswith("/openai/chat/completions")
+    assert services.query_pipeline.evaluator.llm.http.headers["authorization"] == "Bearer gemini-key"
+
+
+def test_evaluator_inherits_generator_settings(settings):
+    configured = settings.model_copy(update={"llm_api_key": SecretStr("k"), "evaluator_model": "claude-sonnet-5"})
+    evaluator = configured.evaluator_endpoint
+    assert (evaluator.provider, evaluator.model, evaluator.api_key) == ("anthropic", "claude-sonnet-5", "k")
+    other_provider = settings.model_copy(update={"llm_api_key": SecretStr("k"), "evaluator_provider": "openai_compatible",
+                                                 "evaluator_base_url": "http://judge/v1"})
+    assert other_provider.evaluator_endpoint.api_key is None
+
+
+def test_status_reports_evaluator(settings):
+    with TestClient(create_app(grok_and_gemini(settings), build_services(grok_and_gemini(settings),
+                                                                         embedder=HashEmbedder()))) as client:
+        components = client.get("/api/system/status").json()["components"]
+    assert components["llm"]["detail"] == "openai_compatible:grok-model"
+    assert components["evaluator"]["detail"] == "openai_compatible:gemini-model"
+    assert "gemini-key" not in str(components) and "xai-key" not in str(components)

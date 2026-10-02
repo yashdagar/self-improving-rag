@@ -30,11 +30,15 @@ def _storage_status(settings: Settings) -> ComponentStatus:
     return ComponentStatus(status="ok", detail=str(settings.data_dir))
 
 
-def _llm_status(settings: Settings) -> ComponentStatus:
-    if not settings.llm_configured:
-        missing = "LLM_BASE_URL" if settings.llm_provider == "openai_compatible" else "LLM_API_KEY"
+def _endpoint_status(endpoint, prefix: str) -> ComponentStatus:
+    if not endpoint.configured:
+        missing = f"{prefix}_BASE_URL" if endpoint.provider == "openai_compatible" else f"{prefix}_API_KEY"
         return ComponentStatus(status="not_configured", detail=f"{missing} is not set")
-    return ComponentStatus(status="ok", detail=f"{settings.llm_provider}:{settings.llm_model}")
+    return ComponentStatus(status="ok", detail=endpoint.label)
+
+
+def _llm_status(settings: Settings) -> ComponentStatus:
+    return _endpoint_status(settings.generator_endpoint, "LLM")
 
 
 COUNTED_TABLES = {
@@ -91,6 +95,7 @@ def system_status(
             "vector_store": vector_store,
             "embeddings": embeddings,
             "llm": llm,
+            "evaluator": _endpoint_status(settings.evaluator_endpoint, "EVALUATOR"),
         },
         counts=counts,
         retrieval=RetrievalConfig(

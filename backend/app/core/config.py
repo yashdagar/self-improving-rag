@@ -1,4 +1,5 @@
 import os
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -9,6 +10,27 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 AI_ML_CATEGORIES = ["cs.AI", "cs.LG", "cs.CL", "cs.CV", "cs.NE", "stat.ML"]
+
+
+Provider = Literal["anthropic", "openai_compatible"]
+
+
+@dataclass(frozen=True)
+class LLMEndpoint:
+    provider: Provider
+    model: str
+    api_key: str | None
+    base_url: str | None
+
+    @property
+    def configured(self) -> bool:
+        if self.provider == "openai_compatible":
+            return bool(self.base_url)
+        return bool(self.api_key or os.environ.get("ANTHROPIC_API_KEY"))
+
+    @property
+    def label(self) -> str:
+        return f"{self.provider}:{self.model}"
 
 
 class Settings(BaseSettings):
@@ -51,7 +73,7 @@ class Settings(BaseSettings):
     retrieval_candidate_pool: int = Field(40, ge=1)
     retrieval_top_k: int = Field(8, ge=1)
 
-    llm_provider: Literal["anthropic", "openai_compatible"] = "anthropic"
+    llm_provider: Provider = "anthropic"
     llm_model: str = "claude-opus-5"
     llm_api_key: SecretStr | None = None
     llm_base_url: str | None = None
@@ -60,7 +82,10 @@ class Settings(BaseSettings):
     llm_temperature: float = Field(0.0, ge=0, le=1)
     llm_max_tokens: int = Field(16000, ge=256)
     llm_timeout_seconds: float = Field(300.0, gt=0)
+    evaluator_provider: Provider | None = None
     evaluator_model: str | None = None
+    evaluator_api_key: SecretStr | None = None
+    evaluator_base_url: str | None = None
 
     alpha_init: float = Field(0.70, ge=0, le=1)
     beta_init: float = Field(0.15, ge=0, le=1)
@@ -92,17 +117,38 @@ class Settings(BaseSettings):
             raise ValueError("alpha_init + beta_init + gamma_init must sum to 1")
         if self.llm_provider == "openai_compatible" and not self.llm_base_url:
             raise ValueError("LLM_BASE_URL is required when LLM_PROVIDER=openai_compatible")
+        if self.evaluator_endpoint.provider == "openai_compatible" and not self.evaluator_endpoint.base_url:
+            raise ValueError("EVALUATOR_BASE_URL is required when the evaluator uses openai_compatible")
         unknown = set(self.arxiv_categories) - set(AI_ML_CATEGORIES)
         if unknown:
             raise ValueError(f"unsupported arXiv categories: {sorted(unknown)}")
         return self
 
     @property
+    def generator_endpoint(self) -> LLMEndpoint:
+        return LLMEndpoint(
+            provider=self.llm_provider,
+            model=self.llm_model,
+            api_key=self.llm_api_key.get_secret_value() if self.llm_api_key else None,
+            base_url=self.llm_base_url,
+        )
+
+    @property
+    def evaluator_endpoint(self) -> LLMEndpoint:
+        generator = self.generator_endpoint
+        provider = self.evaluator_provider or generator.provider
+        same_provider = provider == generator.provider
+        return LLMEndpoint(
+            provider=provider,
+            model=self.evaluator_model or generator.model,
+            api_key=self.evaluator_api_key.get_secret_value() if self.evaluator_api_key
+            else generator.api_key if same_provider else None,
+            base_url=self.evaluator_base_url or (generator.base_url if same_provider else None),
+        )
+
+    @property
     def llm_configured(self) -> bool:
-        if self.llm_provider == "openai_compatible":
-            return bool(self.llm_base_url)
-        key = self.llm_api_key.get_secret_value() if self.llm_api_key else ""
-        return bool(key or os.environ.get("ANTHROPIC_API_KEY"))
+        return self.generator_endpoint.configured
 
     @property
     def sqlite_path(self) -> Path:

@@ -43,7 +43,8 @@ def build_services(
     adapter = WeightAdapter(settings)
     query_pipeline = None
     if llm is not None:
-        judge = evaluator_llm or (build_llm(settings, settings.evaluator_model) if settings.evaluator_model else llm)
+        separate = settings.evaluator_endpoint != settings.generator_endpoint
+        judge = evaluator_llm or (build_llm(settings, settings.evaluator_endpoint) if separate else llm) or llm
         query_pipeline = QueryPipeline(settings, retrieval, AnswerGenerator(llm), SelfEvaluator(judge), adapter)
     return Services(
         paper_retriever=paper_retriever,

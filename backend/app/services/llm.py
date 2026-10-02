@@ -5,7 +5,7 @@ from typing import Protocol, TypeVar
 import httpx
 from pydantic import BaseModel, ValidationError
 
-from app.core.config import Settings
+from app.core.config import LLMEndpoint, Settings
 
 logger = logging.getLogger(__name__)
 
@@ -30,15 +30,15 @@ class LLMClient(Protocol):
 
 
 class AnthropicLLM:
-    def __init__(self, settings: Settings, model: str | None = None, client=None):
+    def __init__(self, settings: Settings, endpoint: LLMEndpoint | None = None, client=None):
         import anthropic
 
+        endpoint = endpoint or settings.generator_endpoint
         self.settings = settings
-        self.model = model or settings.llm_model
-        api_key = settings.llm_api_key.get_secret_value() if settings.llm_api_key else None
+        self.model = endpoint.model
         self.client = client or anthropic.Anthropic(
-            api_key=api_key or None,
-            base_url=settings.llm_base_url or None,
+            api_key=endpoint.api_key or None,
+            base_url=endpoint.base_url or None,
             timeout=settings.llm_timeout_seconds,
         )
 
@@ -75,14 +75,13 @@ class AnthropicLLM:
 
 
 class OpenAICompatibleLLM:
-    def __init__(self, settings: Settings, model: str | None = None, http: httpx.Client | None = None):
+    def __init__(self, settings: Settings, endpoint: LLMEndpoint | None = None, http: httpx.Client | None = None):
+        endpoint = endpoint or settings.generator_endpoint
         self.settings = settings
-        self.model = model or settings.llm_model
-        headers = {}
-        if settings.llm_api_key and settings.llm_api_key.get_secret_value():
-            headers["Authorization"] = f"Bearer {settings.llm_api_key.get_secret_value()}"
+        self.model = endpoint.model
+        headers = {"Authorization": f"Bearer {endpoint.api_key}"} if endpoint.api_key else {}
         self.http = http or httpx.Client(timeout=settings.llm_timeout_seconds, headers=headers)
-        self.url = f"{settings.llm_base_url.rstrip('/')}/chat/completions"
+        self.url = f"{endpoint.base_url.rstrip('/')}/chat/completions"
 
     def _complete(self, messages: list[dict]) -> str:
         payload = {
@@ -124,9 +123,10 @@ class OpenAICompatibleLLM:
                 raise LLMError(f"model output did not match {schema.__name__}: {second}") from second
 
 
-def build_llm(settings: Settings, model: str | None = None) -> LLMClient | None:
-    if not settings.llm_configured:
+def build_llm(settings: Settings, endpoint: LLMEndpoint | None = None) -> LLMClient | None:
+    endpoint = endpoint or settings.generator_endpoint
+    if not endpoint.configured:
         return None
-    if settings.llm_provider == "anthropic":
-        return AnthropicLLM(settings, model)
-    return OpenAICompatibleLLM(settings, model)
+    if endpoint.provider == "anthropic":
+        return AnthropicLLM(settings, endpoint)
+    return OpenAICompatibleLLM(settings, endpoint)
