@@ -79,13 +79,13 @@ def collect_signals(
             signals.append(Signal(chunk_id, query_id, relevance, JUDGED_RELEVANCE_WEIGHT))
 
     supported = session.execute(
-        select(Citation.query_id, Citation.chunk_id, Citation.supported).where(
-            Citation.chunk_id.in_(chunk_ids), Citation.supported.is_not(None)
+        select(Citation.query_id, Citation.chunk_id, Citation.support).where(
+            Citation.chunk_id.in_(chunk_ids), Citation.support.is_not(None)
         )
     )
-    for query_id, chunk_id, is_supported in supported:
+    for query_id, chunk_id, support in supported:
         if keep(query_id):
-            signals.append(Signal(chunk_id, query_id, 1.0 if is_supported else 0.0, CITATION_SUPPORT_WEIGHT))
+            signals.append(Signal(chunk_id, query_id, support, CITATION_SUPPORT_WEIGHT))
     return signals
 
 

@@ -14,6 +14,7 @@ from app.services.generation import EvidenceItem, GeneratedAnswer, build_prompt
 from app.services.llm import AnthropicLLM, LLMError, LLMRefusal, OpenAICompatibleLLM
 from app.services.paper_retrieval import PaperRetriever
 from tests.fakes import FakeArxivClient, HashEmbedder, ScriptedLLM, arxiv_paper
+from tests.test_evaluation import judge_everything_supported
 from tests.test_ranking import NOW
 
 
@@ -147,10 +148,12 @@ def rag_client(settings):
                     "Speculative decoding verification keeps the target distribution.", NOW - timedelta(days=30)),
     ]
     llm = ScriptedLLM(cite_first_two)
-    services = build_services(settings, embedder=HashEmbedder(), llm=llm)
+    judge = ScriptedLLM(judge_everything_supported)
+    services = build_services(settings, embedder=HashEmbedder(), llm=llm, evaluator_llm=judge)
     services.retrieval.paper_retriever = PaperRetriever(settings, FakeArxivClient(papers))
     with TestClient(create_app(settings, services)) as client:
         client.llm = llm
+        client.judge = judge
         yield client
 
 
@@ -192,3 +195,26 @@ def test_list_queries(rag_client):
     assert len(rag_client.get("/api/query").json()) == 2
     scoped = rag_client.get("/api/query", params={"experiment_run": "exp1"}).json()
     assert [(q["experiment_run"], q["cycle"]) for q in scoped] == [("exp1", 0)]
+
+
+def test_query_is_self_evaluated(rag_client):
+    body = rag_client.post("/api/query", json={"query": "How does speculative decoding work?"}).json()
+    evaluation = body["evaluation"]
+    assert evaluation["evaluator_model"] == "scripted-llm"
+    assert evaluation["citation_accuracy"] == pytest.approx(2 / 3)
+    assert evaluation["groundedness"] == pytest.approx(2 / 3)
+    assert evaluation["evidence_coverage"] == 0.5
+    assert evaluation["answer_relevance"] == 0.75
+    assert body["retrieved"][0]["judged_relevance"] == 1.0
+    assert all(r["judged_relevance"] == 0.5 for r in body["retrieved"][1:])
+    assert [c["support"] for c in body["citations"]] == [1.0, 1.0]
+    assert body["latency"]["evaluation_ms"] is not None
+    assert "speedup: missing" in evaluation["reasoning"]["evidence_coverage"]
+
+
+def test_evaluation_failure_keeps_answer(rag_client):
+    rag_client.judge.responses = [LLMError("judge down")]
+    body = rag_client.post("/api/query", json={"query": "How does speculative decoding work?"}).json()
+    assert body["status"] == "completed"
+    assert body["evaluation"] is None
+    assert "evaluation failed" in body["error"]

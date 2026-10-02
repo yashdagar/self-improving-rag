@@ -31,13 +31,14 @@ class CitationOut(BaseModel):
     paper_id: str
     paper_title: str
     claim: str | None
-    supported: bool | None
+    support: float | None
     verdict_reason: str | None
 
 
 class EvaluationOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    retrieval_precision: float
     retrieval_relevance: float
     groundedness: float
     citation_accuracy: float

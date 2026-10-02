@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from app.core.config import Settings
 from app.services.document_processor import DocumentProcessor
 from app.services.embeddings import Embedder, SentenceTransformerEmbedder
+from app.services.evaluation import SelfEvaluator
 from app.services.generation import AnswerGenerator
 from app.services.indexer import Indexer
 from app.services.llm import LLMClient, build_llm
@@ -28,6 +29,7 @@ def build_services(
     settings: Settings,
     embedder: Embedder | None = None,
     llm: LLMClient | None = None,
+    evaluator_llm: LLMClient | None = None,
 ) -> Services:
     embedder = embedder or SentenceTransformerEmbedder(settings)
     vector_store = VectorStore(settings, embedder)
@@ -36,7 +38,11 @@ def build_services(
     indexer = Indexer(vector_store)
     retrieval = RetrievalPipeline(settings, paper_retriever, document_processor, indexer, vector_store, embedder)
     llm = llm or build_llm(settings)
-    query_pipeline = QueryPipeline(settings, retrieval, AnswerGenerator(llm)) if llm else None
+    query_pipeline = None
+    if llm is not None:
+        query_pipeline = QueryPipeline(settings, retrieval, AnswerGenerator(llm))
+        judge = evaluator_llm or (build_llm(settings, settings.evaluator_model) if settings.evaluator_model else llm)
+        query_pipeline.post_processors.append(SelfEvaluator(judge))
     return Services(
         paper_retriever=paper_retriever,
         document_processor=document_processor,

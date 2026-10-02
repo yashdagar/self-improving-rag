@@ -77,6 +77,7 @@ def make_query(session, paper, mode="proposed", status="completed", scores=None,
 
 def uniform_scores(value):
     return {
+        "retrieval_precision": value,
         "retrieval_relevance": value,
         "groundedness": value,
         "citation_accuracy": value,

@@ -76,7 +76,7 @@ def build_query_detail(record: QueryRecord) -> QueryDetail:
                 paper_id=citation.chunk.paper_id,
                 paper_title=citation.chunk.paper.title,
                 claim=citation.claim,
-                supported=citation.supported,
+                support=citation.support,
                 verdict_reason=citation.verdict_reason,
             )
             for citation in record.citations

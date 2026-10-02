@@ -2,6 +2,7 @@ from pydantic import BaseModel
 
 
 class MetricMeans(BaseModel):
+    retrieval_precision: float | None
     retrieval_relevance: float | None
     groundedness: float | None
     citation_accuracy: float | None

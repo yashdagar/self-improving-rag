@@ -6,6 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base, UTCDateTime, utcnow
 
 METRIC_FIELDS = (
+    "retrieval_precision",
     "retrieval_relevance",
     "groundedness",
     "citation_accuracy",
@@ -25,6 +26,7 @@ class Evaluation(Base):
     query_id: Mapped[int] = mapped_column(
         ForeignKey("queries.id", ondelete="CASCADE"), unique=True, index=True
     )
+    retrieval_precision: Mapped[float]
     retrieval_relevance: Mapped[float]
     groundedness: Mapped[float]
     citation_accuracy: Mapped[float]

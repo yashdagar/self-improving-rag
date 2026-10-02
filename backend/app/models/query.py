@@ -89,7 +89,7 @@ class Citation(Base):
     claim_index: Mapped[int] = mapped_column(default=0)
     chunk_id: Mapped[str] = mapped_column(ForeignKey("chunks.id"))
     claim: Mapped[str | None] = mapped_column(Text)
-    supported: Mapped[bool | None]
+    support: Mapped[float | None]
     verdict_reason: Mapped[str | None] = mapped_column(Text)
 
     query: Mapped[QueryRecord] = relationship(back_populates="citations")
