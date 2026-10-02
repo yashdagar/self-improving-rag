@@ -37,6 +37,12 @@ def _endpoint_status(endpoint, prefix: str) -> ComponentStatus:
     return ComponentStatus(status="ok", detail=endpoint.label)
 
 
+def _evaluator_status(settings: Settings, llm: ComponentStatus) -> ComponentStatus:
+    if settings.separate_evaluator:
+        return _endpoint_status(settings.evaluator_endpoint, "EVALUATOR")
+    return ComponentStatus(status=llm.status, detail="same model as llm")
+
+
 def _llm_status(settings: Settings) -> ComponentStatus:
     return _endpoint_status(settings.generator_endpoint, "LLM")
 
@@ -95,7 +101,7 @@ def system_status(
             "vector_store": vector_store,
             "embeddings": embeddings,
             "llm": llm,
-            "evaluator": _endpoint_status(settings.evaluator_endpoint, "EVALUATOR"),
+            "evaluator": _evaluator_status(settings, llm),
         },
         counts=counts,
         retrieval=RetrievalConfig(

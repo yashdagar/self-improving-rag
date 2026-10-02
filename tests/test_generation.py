@@ -292,3 +292,30 @@ def test_openai_compatible_falls_back_without_json_mode(settings):
     assert llm.structured("s", "p", GeneratedAnswer).answer == "ok"
     llm.structured("s", "p", GeneratedAnswer)
     assert seen == [True, False, False]
+
+
+def test_single_model_is_shared_by_writer_and_judge(settings):
+    single = settings.model_copy(update={"llm_api_key": SecretStr("k")})
+    assert not single.separate_evaluator
+    pipeline = build_services(single, embedder=HashEmbedder()).query_pipeline
+    assert pipeline.evaluator.llm is pipeline.generator.llm
+
+
+def test_same_provider_different_judge_model(settings):
+    configured = settings.model_copy(update={
+        "llm_provider": "openai_compatible", "llm_base_url": "https://gemini/openai", "llm_model": "light",
+        "llm_api_key": SecretStr("g"), "evaluator_model": "strong",
+    })
+    pipeline = build_services(configured, embedder=HashEmbedder()).query_pipeline
+    assert (pipeline.generator.model, pipeline.evaluator.llm.model) == ("light", "strong")
+    assert pipeline.evaluator.llm.url == "https://gemini/openai/chat/completions"
+    assert pipeline.evaluator.llm.http.headers["authorization"] == "Bearer g"
+
+
+def test_separate_judge_without_key_is_rejected():
+    from pydantic import ValidationError
+    from app.core.config import Settings
+
+    with pytest.raises(ValidationError, match="EVALUATOR_API_KEY"):
+        Settings(_env_file=None, llm_provider="openai_compatible", llm_base_url="https://api.x.ai/v1",
+                 llm_api_key="x", evaluator_provider="anthropic", evaluator_model="claude-opus-5")

@@ -118,8 +118,11 @@ class Settings(BaseSettings):
             raise ValueError("alpha_init + beta_init + gamma_init must sum to 1")
         if self.llm_provider == "openai_compatible" and not self.llm_base_url:
             raise ValueError("LLM_BASE_URL is required when LLM_PROVIDER=openai_compatible")
-        if self.evaluator_endpoint.provider == "openai_compatible" and not self.evaluator_endpoint.base_url:
+        evaluator = self.evaluator_endpoint
+        if evaluator.provider == "openai_compatible" and not evaluator.base_url:
             raise ValueError("EVALUATOR_BASE_URL is required when the evaluator uses openai_compatible")
+        if self.separate_evaluator and self.llm_configured and not evaluator.configured:
+            raise ValueError("the evaluator uses a different provider, so EVALUATOR_API_KEY is required")
         unknown = set(self.arxiv_categories) - set(AI_ML_CATEGORIES)
         if unknown:
             raise ValueError(f"unsupported arXiv categories: {sorted(unknown)}")
@@ -146,6 +149,10 @@ class Settings(BaseSettings):
             else generator.api_key if same_provider else None,
             base_url=self.evaluator_base_url or (generator.base_url if same_provider else None),
         )
+
+    @property
+    def separate_evaluator(self) -> bool:
+        return self.evaluator_endpoint != self.generator_endpoint
 
     @property
     def llm_configured(self) -> bool:

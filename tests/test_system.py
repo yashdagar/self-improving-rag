@@ -10,6 +10,7 @@ def test_status_reports_components(client, settings):
     assert body["components"]["storage"]["status"] == "ok"
     assert body["components"]["llm"]["status"] == "not_configured"
     assert body["llm"]["api_key_configured"] is False
+    assert body["components"]["evaluator"] == {"status": "not_configured", "detail": "same model as llm"}
     assert body["retrieval"]["arxiv_categories"] == settings.arxiv_categories
     assert settings.chroma_dir.is_dir()
     assert settings.pdf_dir.is_dir()
